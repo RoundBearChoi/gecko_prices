@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore")
 DEFAULT_CONFIG = {
     'n_boots': 5000,
     'n_months': 24,
-    'horizon_hours': 24 * 7 * 2,
+    'horizon_hours': 24 * 7,
     'mean_block_length': 20,
     'low_percentile': 2.5,
     'high_percentile': 97.5,
