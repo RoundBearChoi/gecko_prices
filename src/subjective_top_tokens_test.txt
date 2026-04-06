@@ -4,7 +4,6 @@ bnb
 sol
 doge
 bch
-hype
 link
 xmr
 ltc
