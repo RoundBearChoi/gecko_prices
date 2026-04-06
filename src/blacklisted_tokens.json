@@ -1,0 +1,830 @@
+[
+  {
+    "symbol": "usdt",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (Tether issuer control).",
+    "id": "tether"
+  },
+  {
+    "symbol": "xrp",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Ripple Labs/foundation heavy control; permissioned validator list.",
+    "id": "ripple"
+  },
+  {
+    "symbol": "usdc",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (Circle issuer control).",
+    "id": "usd-coin"
+  },
+  {
+    "symbol": "trx",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Justin Sun dominance; low validator diversity.",
+    "id": "tron"
+  },
+  {
+    "symbol": "figr_heloc",
+    "decentralization_score": 0.2,
+    "brief_rationale": "Tokenized HELOC RWA by Figure (issuer-controlled on Provenance).",
+    "id": "figure-heloc"
+  },
+  {
+    "symbol": "usds",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "usds"
+  },
+  {
+    "symbol": "wbt",
+    "decentralization_score": 0.25,
+    "brief_rationale": "WhiteBIT exchange token; centralized control.",
+    "id": "whitebit"
+  },
+  {
+    "symbol": "leo",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Bitfinex/LEO ecosystem; foundation influence.",
+    "id": "leo-token"
+  },
+  {
+    "symbol": "usde",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (Ethena).",
+    "id": "ethena-usde"
+  },
+  {
+    "symbol": "cc",
+    "decentralization_score": 0.4,
+    "brief_rationale": "Canton Network (institutional TradFi L1); consortium governance.",
+    "id": "canton-network"
+  },
+  {
+    "symbol": "dai",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (MakerDAO collateralized).",
+    "id": "dai"
+  },
+  {
+    "symbol": "usd1",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "usd1-wlfi"
+  },
+  {
+    "symbol": "pyusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (PayPal).",
+    "id": "paypal-usd"
+  },
+  {
+    "symbol": "shib",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Memecoin; whale concentration + no formal governance.",
+    "id": "shiba-inu"
+  },
+  {
+    "symbol": "ton",
+    "decentralization_score": 0.4,
+    "brief_rationale": "Telegram ties; foundation influence.",
+    "id": "the-open-network"
+  },
+  {
+    "symbol": "cro",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Crypto.com exchange ties; limited independent control.",
+    "id": "crypto-com-chain"
+  },
+  {
+    "symbol": "wlfi",
+    "decentralization_score": 0.2,
+    "brief_rationale": "World Liberty Financial; political/issuer-heavy.",
+    "id": "world-liberty-financial"
+  },
+  {
+    "symbol": "usyc",
+    "decentralization_score": 0,
+    "brief_rationale": "Tokenized money-market fund (issuer-controlled).",
+    "id": "hashnote-usyc"
+  },
+  {
+    "symbol": "xaut",
+    "decentralization_score": 0.45,
+    "brief_rationale": "Gold-backed; floats with metal but Tether issuer elements.",
+    "id": "tether-gold"
+  },
+  {
+    "symbol": "paxg",
+    "decentralization_score": 0.45,
+    "brief_rationale": "Gold-backed; Paxos issuer but floats with metal.",
+    "id": "pax-gold"
+  },
+  {
+    "symbol": "buidl",
+    "decentralization_score": 0,
+    "brief_rationale": "BlackRock tokenized T-bill fund (issuer-controlled).",
+    "id": "blackrock-usd-institutional-digital-liquidity-fund"
+  },
+  {
+    "symbol": "usdg",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "global-dollar"
+  },
+  {
+    "symbol": "pi",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Pi Network; mobile mining with central app control.",
+    "id": "pi-network"
+  },
+  {
+    "symbol": "usdf",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "falcon-finance"
+  },
+  {
+    "symbol": "okb",
+    "decentralization_score": 0.25,
+    "brief_rationale": "OKX exchange token; centralized.",
+    "id": "okb"
+  },
+  {
+    "symbol": "htx",
+    "decentralization_score": 0.25,
+    "brief_rationale": "HTX (Huobi) DAO token; exchange influence.",
+    "id": "htx-dao"
+  },
+  {
+    "symbol": "bgb",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Bitget exchange token.",
+    "id": "bitget-token"
+  },
+  {
+    "symbol": "usdy",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged / yield-bearing stable.",
+    "id": "ondo-us-dollar-yield"
+  },
+  {
+    "symbol": "bfusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "bfusd"
+  },
+  {
+    "symbol": "rlusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (Ripple).",
+    "id": "ripple-usd"
+  },
+  {
+    "symbol": "ondo",
+    "decentralization_score": 0.2,
+    "brief_rationale": "RWA/tokenized finance; issuer-dominant.",
+    "id": "ondo-finance"
+  },
+  {
+    "symbol": "jtrsy",
+    "decentralization_score": 0,
+    "brief_rationale": "Janus Henderson tokenized treasury fund.",
+    "id": "janus-henderson-anemoy-treasury-fund"
+  },
+  {
+    "symbol": "gt",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Gate.io exchange token.",
+    "id": "gatechain-token"
+  },
+  {
+    "symbol": "usdd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "usdd"
+  },
+  {
+    "symbol": "kcs",
+    "decentralization_score": 0.25,
+    "brief_rationale": "KuCoin exchange token.",
+    "id": "kucoin-shares"
+  },
+  {
+    "symbol": "eutbl",
+    "decentralization_score": 0,
+    "brief_rationale": "Tokenized EU treasury / fund.",
+    "id": "eutbl"
+  },
+  {
+    "symbol": "wld",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Worldcoin; biometric elements + central claims.",
+    "id": "worldcoin-wld"
+  },
+  {
+    "symbol": "usdtb",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "usdtb"
+  },
+  {
+    "symbol": "nexo",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Nexo platform token; company influence.",
+    "id": "nexo"
+  },
+  {
+    "symbol": "ustb",
+    "decentralization_score": 0,
+    "brief_rationale": "Superstate tokenized T-bills fund.",
+    "id": "superstate-short-duration-us-government-securities-fund-ustb"
+  },
+  {
+    "symbol": "ena",
+    "decentralization_score": 0.4,
+    "brief_rationale": "Ethena (synthetic dollar); newer protocol risks.",
+    "id": "ethena"
+  },
+  {
+    "symbol": "trump",
+    "decentralization_score": 0.2,
+    "brief_rationale": "Political memecoin; high concentration.",
+    "id": "official-trump"
+  },
+  {
+    "symbol": "ousg",
+    "decentralization_score": 0,
+    "brief_rationale": "Tokenized T-bills / money-market fund.",
+    "id": "ousg"
+  },
+  {
+    "symbol": "ylds",
+    "decentralization_score": 0,
+    "brief_rationale": "Tokenized yield-bearing fund.",
+    "id": "ylds"
+  },
+  {
+    "symbol": "hash",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Hash-2 protocol token; limited data.",
+    "id": "hash-2"
+  },
+  {
+    "symbol": "gho",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (Aave).",
+    "id": "gho"
+  },
+  {
+    "symbol": "stable",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged / generic stable.",
+    "id": "stable-2"
+  },
+  {
+    "symbol": "usd0",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (Usual).",
+    "id": "usual-usd"
+  },
+  {
+    "symbol": "jst",
+    "decentralization_score": 0.4,
+    "brief_rationale": "JUST (TRON ecosystem).",
+    "id": "just"
+  },
+  {
+    "symbol": "bonk",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Solana memecoin.",
+    "id": "bonk"
+  },
+  {
+    "symbol": "tusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "true-usd"
+  },
+  {
+    "symbol": "a7a5",
+    "decentralization_score": 0.2,
+    "brief_rationale": "Obscure low-cap token; typical early concentration.",
+    "id": "a7a5"
+  },
+  {
+    "symbol": "eurc",
+    "decentralization_score": 0,
+    "brief_rationale": "Euro-pegged stablecoin.",
+    "id": "euro-coin"
+  },
+  {
+    "symbol": "jaaa",
+    "decentralization_score": 0,
+    "brief_rationale": "Janus Henderson tokenized CLO fund.",
+    "id": "janus-henderson-anemoy-aaa-clo-fund"
+  },
+  {
+    "symbol": "pengu",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Pudgy Penguins memecoin/NFT token.",
+    "id": "pudgy-penguins"
+  },
+  {
+    "symbol": "fdusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "first-digital-usd"
+  },
+  {
+    "symbol": "dexe",
+    "decentralization_score": 0.35,
+    "brief_rationale": "DeXe governance token; team influence.",
+    "id": "dexe"
+  },
+  {
+    "symbol": "prime",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Hastra Prime tokenized asset.",
+    "id": "hastra-prime"
+  },
+  {
+    "symbol": "usx",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "usx"
+  },
+  {
+    "symbol": "sun",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Sun (TRON DeFi); ecosystem ties.",
+    "id": "sun-token"
+  },
+  {
+    "symbol": "adi",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Adi token; low-cap.",
+    "id": "adi-token"
+  },
+  {
+    "symbol": "nft",
+    "decentralization_score": 0.3,
+    "brief_rationale": "APENFT (NFT marketplace).",
+    "id": "apenft"
+  },
+  {
+    "symbol": "btt",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Bittorrent token; TRON ecosystem.",
+    "id": "bittorrent"
+  },
+  {
+    "symbol": "usdai",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "usdai"
+  },
+  {
+    "symbol": "vvv",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Venice token (AI/privacy).",
+    "id": "venice-token"
+  },
+  {
+    "symbol": "river",
+    "decentralization_score": 0.3,
+    "brief_rationale": "River RWA/tokenized asset.",
+    "id": "river"
+  },
+  {
+    "symbol": "frax",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin/protocol.",
+    "id": "frax"
+  },
+  {
+    "symbol": "fo",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Official FO memecoin/low-cap.",
+    "id": "official-fo"
+  },
+  {
+    "symbol": "kite",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Kite-2 protocol token.",
+    "id": "kite-2"
+  },
+  {
+    "symbol": "2z",
+    "decentralization_score": 0.3,
+    "brief_rationale": "DoubleZero token; low-cap.",
+    "id": "doublezero"
+  },
+  {
+    "symbol": "crvusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (Curve).",
+    "id": "crvusd"
+  },
+  {
+    "symbol": "floki",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Floki memecoin.",
+    "id": "floki"
+  },
+  {
+    "symbol": "apepe",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Ape-and-Pepe memecoin.",
+    "id": "ape-and-pepe"
+  },
+  {
+    "symbol": "xpl",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Plasma (new L1).",
+    "id": "plasma"
+  },
+  {
+    "symbol": "spx",
+    "decentralization_score": 0.25,
+    "brief_rationale": "SPX6900 memecoin.",
+    "id": "spx6900"
+  },
+  {
+    "symbol": "syrup",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Syrup (Syrup Finance token).",
+    "id": "syrup"
+  },
+  {
+    "symbol": "edge",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Edgex low-cap.",
+    "id": "edgex"
+  },
+  {
+    "symbol": "btse",
+    "decentralization_score": 0.25,
+    "brief_rationale": "BTSE exchange token.",
+    "id": "btse-token"
+  },
+  {
+    "symbol": "usda",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "usda-2"
+  },
+  {
+    "symbol": "ausd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "agora-dollar"
+  },
+  {
+    "symbol": "vsn",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Vision-3 low-cap.",
+    "id": "vision-3"
+  },
+  {
+    "symbol": "uds",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Undeads Games (gaming token).",
+    "id": "undeads-games"
+  },
+  {
+    "symbol": "lit",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Lighter (perps DEX).",
+    "id": "lighter"
+  },
+  {
+    "symbol": "9bit",
+    "decentralization_score": 0.2,
+    "brief_rationale": "The9Bit low-cap.",
+    "id": "the9bit"
+  },
+  {
+    "symbol": "tel",
+    "decentralization_score": 0.4,
+    "brief_rationale": "Telcoin (mobile payments).",
+    "id": "telcoin"
+  },
+  {
+    "symbol": "bcap",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Blockchain Capital tokenized.",
+    "id": "blockchain-capital"
+  },
+  {
+    "symbol": "b",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Build-on low-cap.",
+    "id": "build-on"
+  },
+  {
+    "symbol": "lunc",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Terra Luna Classic; post-crash recovery.",
+    "id": "terra-luna"
+  },
+  {
+    "symbol": "pc0000031",
+    "decentralization_score": 0.15,
+    "brief_rationale": "Tradable NA rent-financing platform token (issuer-controlled).",
+    "id": "tradable-na-rent-financing-platform-sstn"
+  },
+  {
+    "symbol": "reusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Re-protocol tokenized USD.",
+    "id": "re-protocol-reusd"
+  },
+  {
+    "symbol": "wfi",
+    "decentralization_score": 0.25,
+    "brief_rationale": "WeFi low-cap.",
+    "id": "wefi"
+  },
+  {
+    "symbol": "real",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Reallink RWA token.",
+    "id": "reallink"
+  },
+  {
+    "symbol": "borg",
+    "decentralization_score": 0.4,
+    "brief_rationale": "SwissBorg (wealth platform).",
+    "id": "swissborg"
+  },
+  {
+    "symbol": "xcn",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Chain token.",
+    "id": "chain-2"
+  },
+  {
+    "symbol": "siren",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Siren-2 options protocol.",
+    "id": "siren-2"
+  },
+  {
+    "symbol": "nusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "nusd-2"
+  },
+  {
+    "symbol": "wif",
+    "decentralization_score": 0.25,
+    "brief_rationale": "dogwifhat memecoin.",
+    "id": "dogwifcoin"
+  },
+  {
+    "symbol": "ustbl",
+    "decentralization_score": 0,
+    "brief_rationale": "Spiko US T-bills money-market fund.",
+    "id": "spiko-us-t-bills-money-market-fund"
+  },
+  {
+    "symbol": "s",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Sonic-3 low-cap.",
+    "id": "sonic-3"
+  },
+  {
+    "symbol": "ff",
+    "decentralization_score": 0.2,
+    "brief_rationale": "Falcon Finance token.",
+    "id": "falcon-finance-ff"
+  },
+  {
+    "symbol": "mx",
+    "decentralization_score": 0.25,
+    "brief_rationale": "MX Token (MXC exchange).",
+    "id": "mx-token"
+  },
+  {
+    "symbol": "twt",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Trust Wallet token.",
+    "id": "trust-wallet-token"
+  },
+  {
+    "symbol": "koge",
+    "decentralization_score": 0.25,
+    "brief_rationale": "BNB48 Club token.",
+    "id": "bnb48-club-token"
+  },
+  {
+    "symbol": "fdit",
+    "decentralization_score": 0,
+    "brief_rationale": "Fidelity tokenized interest fund.",
+    "id": "fidelity-digital-interest-token"
+  },
+  {
+    "symbol": "ab",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Newton Project low-cap.",
+    "id": "newton-project"
+  },
+  {
+    "symbol": "satusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Satoshi stablecoin.",
+    "id": "satoshi-stablecoin"
+  },
+  {
+    "symbol": "grass",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Grass (decentralized bandwidth).",
+    "id": "grass"
+  },
+  {
+    "symbol": "eurs",
+    "decentralization_score": 0,
+    "brief_rationale": "Euro-pegged stablecoin (Stasis).",
+    "id": "stasis-eurs"
+  },
+  {
+    "symbol": "gusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (Gemini).",
+    "id": "gusd"
+  },
+  {
+    "symbol": "h",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Humanity (identity protocol).",
+    "id": "humanity"
+  },
+  {
+    "symbol": "ft",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Flying Tulip low-cap.",
+    "id": "flying-tulip"
+  },
+  {
+    "symbol": "onyc",
+    "decentralization_score": 0.25,
+    "brief_rationale": "ONYC tokenized asset.",
+    "id": "onyc"
+  },
+  {
+    "symbol": "rune",
+    "decentralization_score": 0.6,
+    "brief_rationale": "THORChain cross-chain; permissionless liquidity.",
+    "id": "thorchain"
+  },
+  {
+    "symbol": "sto",
+    "decentralization_score": 0.35,
+    "brief_rationale": "StakeStone (liquid staking).",
+    "id": "stakestone"
+  },
+  {
+    "symbol": "crclon",
+    "decentralization_score": 0.2,
+    "brief_rationale": "Circle/ONDO tokenized stock (issuer-controlled).",
+    "id": "circle-internet-group-ondo-tokenized-stock"
+  },
+  {
+    "symbol": "bananas31",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Banana-for-Scale memecoin.",
+    "id": "banana-for-scale-2"
+  },
+  {
+    "symbol": "thbill",
+    "decentralization_score": 0,
+    "brief_rationale": "Theo short-duration US Treasury fund.",
+    "id": "theo-short-duration-us-treasury-fund"
+  },
+  {
+    "symbol": "acred",
+    "decentralization_score": 0,
+    "brief_rationale": "Apollo diversified credit securitize fund.",
+    "id": "apollo-diversified-credit-securitize-fund"
+  },
+  {
+    "symbol": "ultima",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Ultima low-cap.",
+    "id": "ultima"
+  },
+  {
+    "symbol": "soso",
+    "decentralization_score": 0.3,
+    "brief_rationale": "SOSO Value low-cap.",
+    "id": "sosovalue"
+  },
+  {
+    "symbol": "avusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "avant-usd"
+  },
+  {
+    "symbol": "a",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Vaulta low-cap.",
+    "id": "vaulta"
+  },
+  {
+    "symbol": "sent",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Sentient (AI).",
+    "id": "sentient"
+  },
+  {
+    "symbol": "sn64",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Chutes low-cap.",
+    "id": "chutes"
+  },
+  {
+    "symbol": "gekko",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Gekko low-cap memecoin-style.",
+    "id": "gekko"
+  },
+  {
+    "symbol": "gomining",
+    "decentralization_score": 0.35,
+    "brief_rationale": "GMT token (GoMining).",
+    "id": "gmt-token"
+  },
+  {
+    "symbol": "cash",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "cash-4"
+  },
+  {
+    "symbol": "frxusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (Frax).",
+    "id": "frax-usd"
+  },
+  {
+    "symbol": "usdf",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin (Astherus).",
+    "id": "astherus-usdf"
+  },
+  {
+    "symbol": "pusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "pleasing-usd"
+  },
+  {
+    "symbol": "wemix",
+    "decentralization_score": 0.35,
+    "brief_rationale": "WEMIX (gaming L1).",
+    "id": "wemix-token"
+  },
+  {
+    "symbol": "iusd",
+    "decentralization_score": 0,
+    "brief_rationale": "Fiat-pegged stablecoin.",
+    "id": "infinifi-usd"
+  },
+  {
+    "symbol": "pc0000023",
+    "decentralization_score": 0.15,
+    "brief_rationale": "Tradable Singapore fintech token (issuer-controlled).",
+    "id": "tradable-singapore-fintech-ssl-2"
+  },
+  {
+    "symbol": "shfl",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Shuffle-2 low-cap.",
+    "id": "shuffle-2"
+  },
+  {
+    "symbol": "eurcv",
+    "decentralization_score": 0,
+    "brief_rationale": "Euro-pegged stablecoin (Société Générale).",
+    "id": "societe-generale-forge-eurcv"
+  },
+  {
+    "symbol": "tkx",
+    "decentralization_score": 0.25,
+    "brief_rationale": "Tokenize Xchange (exchange token).",
+    "id": "tokenize-xchange"
+  },
+  {
+    "symbol": "pieverse",
+    "decentralization_score": 0.3,
+    "brief_rationale": "Pieverse low-cap.",
+    "id": "pieverse"
+  },
+  {
+    "symbol": "rlb",
+    "decentralization_score": 0.35,
+    "brief_rationale": "Rollbit coin (gambling platform).",
+    "id": "rollbit-coin"
+  }
+]
