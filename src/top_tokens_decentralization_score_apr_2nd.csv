@@ -1,0 +1,251 @@
+Rank,Symbol,blacklist,Decentralization Score,Brief Rationale (multi-angle: operational + economic + governance + permissionlessness)
+1,btc,,1,Gold standard PoW; global miner distribution; no team/foundation; 16+ years battle-tested; highest permissionlessness.
+2,eth,,0.85,Top validator/node count + client diversity; PoS stake risks (Lido concentration) but vast factions and on-chain governance.
+3,usdt,1,stable coin,Fiat-pegged stablecoin (Tether issuer control).
+4,bnb,,0.35,Binance ecosystem influence; limited/controlled validators; low Nakamoto.
+5,xrp,1,0.25,Ripple Labs/foundation heavy control; permissioned validator list.
+6,usdc,1,stable coin,Fiat-pegged stablecoin (Circle issuer control).
+7,sol,,0.55,Large validator set but PoH hardware barriers; Nakamoto ~12; improving but trade-offs.
+8,trx,1,0.3,Justin Sun dominance; low validator diversity.
+9,figr_heloc,1,0.2,Tokenized HELOC RWA by Figure (issuer-controlled on Provenance).
+10,doge,,0.7,PoW (merged-mined); community-driven; no strong foundation.
+11,usds,1,stable coin,Fiat-pegged stablecoin.
+12,wbt,1,0.25,WhiteBIT exchange token; centralized control.
+13,leo,1,0.25,Bitfinex/LEO ecosystem; foundation influence.
+14,bch,,0.85,PoW BTC fork; similar high miner distribution and permissionlessness.
+15,ada,,0.8,High validators + delegation; on-chain governance; Nakamoto ~22.
+16,hype,,0.45,Hyperliquid L1 (perp DEX); relatively new validator distribution.
+17,xmr,,0.95,Privacy-first PoW; ASIC-resistant; excellent censorship resistance.
+18,link,,0.6,Decentralized oracle nodes; staking but data-source dependencies.
+19,usde,1,stable coin,Fiat-pegged stablecoin (Ethena).
+20,xlm,,0.4,Stellar foundation; somewhat permissioned validators.
+21,cc,1,0.4,Canton Network (institutional TradFi L1); consortium governance.
+22,dai,1,stable coin,Fiat-pegged stablecoin (MakerDAO collateralized).
+23,usd1,1,stable coin,Fiat-pegged stablecoin.
+24,m,,0.45,Memecore (new L1 for memes); early-stage L1 risks.
+25,ltc,,0.8,Established PoW; permissionless like BTC but smaller scale.
+26,zec,,0.75,PoW with privacy; solid but smaller miner base.
+27,pyusd,1,stable coin,Fiat-pegged stablecoin (PayPal).
+28,avax,,0.65,Good validators + delegation; Nakamoto ~23.
+29,hbar,,0.45,Hedera; council/governance centralization elements.
+30,rain,,0.5,Decentralized prediction markets on Arbitrum; DAO + permissionless.
+31,shib,1,0.3,Memecoin; whale concentration + no formal governance.
+32,sui,,0.5,Modern Move L1; solid but newer validator risks.
+33,ton,1,0.4,Telegram ties; foundation influence.
+34,tao,,0.55,Bittensor (AI); subnet validators but concentration risks.
+35,cro,1,0.3,Crypto.com exchange ties; limited independent control.
+36,wlfi,1,0.2,World Liberty Financial; political/issuer-heavy.
+37,usyc,1,stable coin,Tokenized money-market fund (issuer-controlled).
+38,xaut,1,0.45,Gold-backed; floats with metal but Tether issuer elements.
+39,paxg,1,0.45,Gold-backed; Paxos issuer but floats with metal.
+40,buidl,1,stable coin,BlackRock tokenized T-bill fund (issuer-controlled).
+41,mnt,,0.4,Mantle L2; inherits ETH + some sequencer risks.
+42,uni,,0.65,Uniswap DAO on ETH; strong community governance.
+43,dot,,0.8,Highest PoS Nakamoto (~123); nominated validators + parachains.
+44,usdg,1,stable coin,Fiat-pegged stablecoin.
+45,pi,1,0.35,Pi Network; mobile mining with central app control.
+46,usdf,1,stable coin,Fiat-pegged stablecoin.
+47,okb,1,0.25,OKX exchange token; centralized.
+48,sky,,0.6,Sky Protocol (MakerDAO successor); strong DeFi DAO on ETH.
+49,aster,,0.4,Aster L2; newer with sequencer/governance risks.
+50,htx,1,0.25,HTX (Huobi) DAO token; exchange influence.
+51,near,,0.55,Sharded L1; Nakamoto ~9; improving but trade-offs.
+52,aave,,0.6,Strong DAO on ETH; permissionless lending.
+53,pepe,1,0.25,Memecoin; typical whale concentration.
+54,bgb,1,0.25,Bitget exchange token.
+55,usdy,1,stable coin,Fiat-pegged / yield-bearing stable.
+56,bfusd,1,stable coin,Fiat-pegged stablecoin.
+57,rlusd,1,stable coin,Fiat-pegged stablecoin (Ripple).
+58,ondo,1,0.2,RWA/tokenized finance; issuer-dominant.
+59,etc,,0.8,PoW ETH fork; permissionless.
+60,icp,,0.5,Internet Computer L1; node-provider concentration.
+61,jtrsy,1,stable coin,Janus Henderson tokenized treasury fund.
+62,gt,1,0.25,Gate.io exchange token.
+63,usdd,1,stable coin,Fiat-pegged stablecoin.
+64,kcs,1,0.25,KuCoin exchange token.
+65,qnt,,0.4,Enterprise-focused; limited public validator data.
+66,pump,1,0.3,Pump.fun (meme launchpad); community but platform risks.
+67,pol,,0.45,Polygon ecosystem; DAO + historical team influence.
+68,eutbl,1,stable coin,Tokenized EU treasury / fund.
+69,algo,,0.65,Algorand; high validators + pure PoS.
+70,render,,0.55,Decentralized GPU network; node operators.
+71,wld,1,0.35,Worldcoin; biometric elements + central claims.
+72,usdtb,1,stable coin,Fiat-pegged stablecoin.
+73,kas,,0.7,Kaspa PoW blockDAG; permissionless miners.
+74,nexo,1,0.35,Nexo platform token; company influence.
+75,morpho,,0.55,DeFi lending DAO on ETH.
+76,atom,,0.6,Cosmos hub; IBC + governance but low Nakamoto.
+77,ustb,1,stable coin,Superstate tokenized T-bills fund.
+78,night,,0.4,Midnight (privacy L1); newer project.
+79,ena,1,0.4,Ethena (synthetic dollar); newer protocol risks.
+80,apt,,0.5,Aptos Move L1; solid validators.
+81,trump,1,0.2,Political memecoin; high concentration.
+82,flr,,0.45,Flare (oracle/data); improving but foundation ties.
+83,fil,,0.55,Filecoin storage; node incentives with some concentration.
+84,bdx,,0.65,Beldex privacy hybrid; good resistance.
+85,ousg,1,stable coin,Tokenized T-bills / money-market fund.
+86,ylds,1,stable coin,Tokenized yield-bearing fund.
+87,xdc,,0.4,XDC enterprise chain; hybrid governance.
+88,hash,1,0.35,Hash-2 protocol token; limited data.
+89,gho,1,stable coin,Fiat-pegged stablecoin (Aave).
+90,vet,,0.45,VeChain; enterprise partnerships introduce centralization.
+91,stable,1,stable coin,Fiat-pegged / generic stable.
+92,usd0,1,stable coin,Fiat-pegged stablecoin (Usual).
+93,jst,1,0.4,JUST (TRON ecosystem).
+94,arb,,0.55,Arbitrum L2 DAO; inherits ETH.
+95,jup,,0.45,Jupiter (Solana aggregator) DAO.
+96,fet,,0.5,Fetch.ai (AI); merged ecosystem.
+97,bonk,1,0.3,Solana memecoin.
+98,tusd,1,stable coin,Fiat-pegged stablecoin.
+99,zro,,0.4,LayerZero interoperability; operator risks.
+100,a7a5,1,0.2,Obscure low-cap token; typical early concentration.
+101,cake,,0.5,PancakeSwap DAO on BNB Chain.
+102,virtual,,0.45,Virtual Protocol (AI agents); newer.
+103,chz,,0.4,Chiliz sports fan tokens; platform centralization.
+104,eurc,1,stable coin,Euro-pegged stablecoin.
+105,stx,,0.55,Stacks (BTC L2); good but BTC-dependent.
+106,jaaa,1,stable coin,Janus Henderson tokenized CLO fund.
+107,pengu,1,0.25,Pudgy Penguins memecoin/NFT token.
+108,fdusd,1,stable coin,Fiat-pegged stablecoin.
+109,dash,,0.75,Established PoW; solid miner distribution.
+110,dexe,1,0.35,DeXe governance token; team influence.
+111,prime,1,0.25,Hastra Prime tokenized asset.
+112,xtz,,0.7,Tezos self-amending PoS; strong governance.
+113,kau,,0.45,Kinesis gold-backed (floats with metal).
+114,usx,1,stable coin,Fiat-pegged stablecoin.
+115,ethfi,,0.4,Ether.fi restaking; newer protocol.
+116,sei,,0.5,Sei L1 (orderbook focus).
+117,dcr,,0.8,Decred hybrid PoW/PoS; excellent governance.
+118,sun,1,0.3,Sun (TRON DeFi); ecosystem ties.
+119,adi,1,0.25,Adi token; low-cap.
+120,nft,1,0.3,APENFT (NFT marketplace).
+121,gno,,0.65,Gnosis DAO; strong on ETH.
+122,crv,,0.6,Curve DAO on ETH.
+123,btt,1,0.35,Bittorrent token; TRON ecosystem.
+124,usdai,1,stable coin,Fiat-pegged stablecoin.
+125,vvv,1,0.35,Venice token (AI/privacy).
+126,river,1,0.3,River RWA/tokenized asset.
+127,aero,,0.55,Aerodrome Finance (Base DEX) DAO.
+128,bsv,,0.8,Bitcoin SV PoW fork.
+129,inj,,0.55,Injective L1.
+130,ldo,,0.5,Lido DAO; stake concentration risk.
+131,kag,,0.45,Kinesis silver-backed (floats with metal).
+132,cfx,,0.45,Conflux L1.
+133,kaia,,0.45,Kaia L1 (ex-Klaytn).
+134,frax,1,stable coin,Fiat-pegged stablecoin/protocol.
+135,fo,1,0.25,Official FO memecoin/low-cap.
+136,kite,1,0.35,Kite-2 protocol token.
+137,2z,1,0.3,DoubleZero token; low-cap.
+138,crvusd,1,stable coin,Fiat-pegged stablecoin (Curve).
+139,jasmy,,0.4,Jasmy IoT token.
+140,floki,1,0.3,Floki memecoin.
+141,tia,,0.55,Celestia (data availability L1).
+142,grt,,0.5,The Graph indexing; decentralized subgraph.
+143,iota,,0.45,IOTA (DAG); coordinator phase-out complete.
+144,apepe,1,0.25,Ape-and-Pepe memecoin.
+145,xpl,1,0.35,Plasma (new L1).
+146,mon,,0.4,Monad (EVM-parallel L1); pre-launch risks.
+147,spx,1,0.25,SPX6900 memecoin.
+148,ohm,,0.5,Olympus DAO (bonding protocol).
+149,syrup,1,0.35,Syrup (Syrup Finance token).
+150,edge,1,0.3,Edgex low-cap.
+151,zbcn,,0.4,Zebec Network (streaming).
+152,op,,0.55,Optimism L2 DAO.
+153,btse,1,0.25,BTSE exchange token.
+154,pyth,,0.55,Pyth oracle network; many publishers.
+155,usda,1,stable coin,Fiat-pegged stablecoin.
+156,ausd,1,stable coin,Fiat-pegged stablecoin.
+157,ens,,0.6,Ethereum Name Service DAO.
+158,vsn,1,0.25,Vision-3 low-cap.
+159,uds,1,0.3,Undeads Games (gaming token).
+160,lit,1,0.35,Lighter (perps DEX).
+161,9bit,1,0.2,The9Bit low-cap.
+162,tel,1,0.4,Telcoin (mobile payments).
+163,bcap,1,0.25,Blockchain Capital tokenized.
+164,b,1,0.3,Build-on low-cap.
+165,sand,,0.45,The Sandbox (metaverse); DAO elements.
+166,lunc,1,0.3,Terra Luna Classic; post-crash recovery.
+167,strk,,0.45,Starknet L2; improving governance.
+168,hnt,,0.55,Helium (IoT wireless); node operators.
+169,neo,,0.5,Neo (enterprise L1).
+170,pc0000031,1,0.15,Tradable NA rent-financing platform token (issuer-controlled).
+171,axs,,0.45,Axie Infinity (gaming); Ronin sidechain.
+172,reusd,1,stable coin,Re-protocol tokenized USD.
+173,wfi,1,0.25,WeFi low-cap.
+174,pendle,,0.55,Pendle yield-trading DAO.
+175,real,1,0.3,Reallink RWA token.
+176,borg,1,0.4,SwissBorg (wealth platform).
+177,xcn,1,0.35,Chain token.
+178,siren,1,0.35,Siren-2 options protocol.
+179,nusd,1,stable coin,Fiat-pegged stablecoin.
+180,wif,1,0.25,dogwifhat memecoin.
+181,ustbl,1,stable coin,Spiko US T-bills money-market fund.
+182,ip,,0.4,Story-2 (IP protocol).
+183,ray,,0.45,Raydium (Solana DEX); inherits SOL.
+184,mana,,0.45,Decentraland metaverse DAO.
+185,s,1,0.35,Sonic-3 low-cap.
+186,fartcoin,1,0.25,Fartcoin memecoin.
+187,ff,1,0.2,Falcon Finance token.
+188,mx,1,0.25,MX Token (MXC exchange).
+189,zk,,0.4,zkSync L2.
+190,twt,1,0.35,Trust Wallet token.
+191,koge,1,0.25,BNB48 Club token.
+192,fdit,1,stable coin,Fidelity tokenized interest fund.
+193,comp,,0.6,Compound DAO on ETH.
+194,ab,1,0.25,Newton Project low-cap.
+195,wal,,0.4,Walrus-2 (storage).
+196,satusd,1,stable coin,Satoshi stablecoin.
+197,grass,1,0.35,Grass (decentralized bandwidth).
+198,eurs,1,stable coin,Euro-pegged stablecoin (Stasis).
+199,cvx,,0.55,Convex Finance DAO.
+200,zano,,0.65,Zano privacy-focused; strong resistance.
+201,gusd,1,stable coin,Fiat-pegged stablecoin (Gemini).
+202,h,1,0.3,Humanity (identity protocol).
+203,ft,1,0.25,Flying Tulip low-cap.
+204,theta,,0.45,Theta (video/CDN); guardian nodes.
+205,onyc,1,0.25,ONYC tokenized asset.
+206,bat,,0.5,Basic Attention Token; Brave ecosystem.
+207,rune,1,0.6,THORChain cross-chain; permissionless liquidity.
+208,sfp,,0.4,SafePal (wallet).
+209,sto,1,0.35,StakeStone (liquid staking).
+210,gala,,0.4,Gala Games (DAO but gaming centralization).
+211,qrl,,0.55,Quantum Resistant Ledger (post-quantum).
+212,crclon,1,0.2,Circle/ONDO tokenized stock (issuer-controlled).
+213,bananas31,1,0.25,Banana-for-Scale memecoin.
+214,xec,,0.7,eCash (PoW BTC fork).
+215,thbill,1,stable coin,Theo short-duration US Treasury fund.
+216,acred,1,stable coin,Apollo diversified credit securitize fund.
+217,ultima,1,0.3,Ultima low-cap.
+218,qubic,,0.4,Qubic Network (AI compute).
+219,soso,1,0.3,SOSO Value low-cap.
+220,ath,,0.4,Aethir (decentralized GPU).
+221,avusd,1,stable coin,Fiat-pegged stablecoin.
+222,a,1,0.3,Vaulta low-cap.
+223,glm,,0.5,Golem (decentralized compute).
+224,sent,1,0.35,Sentient (AI).
+225,1inch,,0.6,1inch DAO aggregator on ETH.
+226,sn64,1,0.25,Chutes low-cap.
+227,akt,,0.55,Akash Network (decentralized cloud).
+228,gekko,1,0.3,Gekko low-cap memecoin-style.
+229,gomining,1,0.35,GMT token (GoMining).
+230,ozo,,0.4,Ozone Chain.
+231,cash,1,stable coin,Fiat-pegged stablecoin.
+232,frxusd,1,stable coin,Fiat-pegged stablecoin (Frax).
+233,usdf,1,stable coin,Fiat-pegged stablecoin (Astherus).
+234,trac,,0.5,OriginTrail (supply-chain).
+235,jto,,0.45,Jito (Solana MEV).
+236,pusd,1,stable coin,Fiat-pegged stablecoin.
+237,fluid,,0.5,InstaDapp (DeFi automation).
+238,wemix,1,0.35,WEMIX (gaming L1).
+239,iusd,1,stable coin,Fiat-pegged stablecoin.
+240,pc0000023,1,0.15,Tradable Singapore fintech token (issuer-controlled).
+241,shfl,1,0.35,Shuffle-2 low-cap.
+242,cow,,0.55,CoW Protocol (DEX aggregator DAO).
+243,imx,,0.5,Immutable X (gaming L2).
+244,eurcv,1,stable coin,Euro-pegged stablecoin (Société Générale).
+245,ar,,0.6,Arweave (permanent storage); strong node incentives.
+246,egld,,0.55,MultiversX (ex-Elrond) L1.
+247,eigen,,0.4,EigenLayer restaking; newer risks.
+249,tkx,1,0.25,Tokenize Xchange (exchange token).
+250,pieverse,1,0.3,Pieverse low-cap.
+251,rlb,1,0.35,Rollbit coin (gambling platform).
