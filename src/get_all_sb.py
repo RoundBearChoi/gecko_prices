@@ -14,11 +14,11 @@ except ImportError:
 
 # ==================== CONFIGURATION ====================
 CONFIG = {
-    'tokens_file': 'subjective_top_tokens_test.txt',
+    'tokens_file': 'subjective_top_tokens.txt',
     'output_csv': 'sb_pair_analysis.csv',
     'allow_duplicates': False,
     'start_from_bottom': True,
-    'n_months': 18,
+    'n_months': 24,
     'horizon_hours': None,
     'n_boots': 5000,
     'data_dir': 'fetched_data',

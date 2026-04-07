@@ -16,13 +16,12 @@ pepe
 etc
 kcs
 pump
-morpho
 jup
 bonk
 cake
-bsv
 fartcoin
 ray
+mx
 1inch
 babydoge
 orca

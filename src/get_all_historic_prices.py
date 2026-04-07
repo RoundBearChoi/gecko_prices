@@ -10,7 +10,7 @@ import fetch_gecko_price_history as gecko
 
 # ==================== CONFIG SECTION ====================
 CONFIG = {
-    "subjective_tokens_file": "subjective_top_tokens_test.txt",
+    "subjective_tokens_file": "subjective_top_tokens.txt",
     "n_months": 24,
     "force_fresh_download": True,
 }
