@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 import pandas as pd
+import numpy as np
 from itertools import combinations
 import sys
 import time
 from pathlib import Path
 
-# Import core function from your existing script (must be in same folder)
 try:
     from sb_tokens import get_sb_analysis
 except ImportError:
@@ -16,19 +16,18 @@ except ImportError:
 CONFIG = {
     'tokens_file': 'subjective_top_tokens_test.txt',
     'output_csv': 'sb_pair_analysis.csv',
-    'allow_duplicates': False, # False = one direction only (red-api3, not api3-red)
-    'start_from_bottom': True, # True = process bottom-listed tokens first
-    'n_months': 18, # None = use sb_tokens default
-    'horizon_hours': None, # None = use sb_tokens default
+    'allow_duplicates': False,
+    'start_from_bottom': True,
+    'n_months': 18,
+    'horizon_hours': None,
     'n_boots': 5000,
     'data_dir': 'fetched_data',
-    'seed': 42, # classic choice. keep consistency across pairs
+    'seed': 42,
     'skip_missing_data': True,
 }
 # ======================================================
 
 def load_tokens(filename: str) -> list[str]:
-    """Load and clean the token list."""
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             tokens = [line.strip().lower() for line in f if line.strip()]
@@ -39,7 +38,6 @@ def load_tokens(filename: str) -> list[str]:
         sys.exit(1)
 
 def generate_pairs(tokens: list[str], allow_duplicates: bool, start_from_bottom: bool):
-    """Generate the exact pair ordering you requested."""
     token_index = {token: idx for idx, token in enumerate(tokens)}
     
     if allow_duplicates:
@@ -85,7 +83,7 @@ def main():
                 n_months=CONFIG['n_months'],
                 horizon_hours=CONFIG['horizon_hours'],
                 n_boots=CONFIG['n_boots'],
-                draw_charts=False,                    # ← hardcoded (charts disabled for speed)
+                draw_charts=False,
                 data_dir=CONFIG['data_dir'],
                 seed=CONFIG['seed'],
             )
@@ -93,40 +91,46 @@ def main():
             row = {
                 'token0': token0.upper(),
                 'token1': token1.upper(),
-                'current_price': round(res['current_price'], 8),
+                'current_price': round(res['current_price'], 8) if not np.isnan(res['current_price']) else np.nan,
                 'high_conf_lower': round(res['high_conf_lower'], 6),
                 'high_conf_upper': round(res['high_conf_upper'], 6),
                 'typical_lower': round(res['typical_lower'], 6),
                 'typical_upper': round(res['typical_upper'], 6),
                 'median_max_dev': round(res['median_max_dev'], 6),
-                'lag1_acf': round(res['lag1_acf'], 6),
-                'lag1_slope': round(res['lag1_slope'], 6),
+                'lag1_acf': round(res['lag1_acf'], 6) if not np.isnan(res['lag1_acf']) else np.nan,
+                'lag1_slope': round(res['lag1_slope'], 6) if not np.isnan(res['lag1_slope']) else np.nan,
                 'num_observations': res['num_observations'],
-                'total_overlapping_hours': res.get('total_overlapping_hours', 0),   # NEW COLUMN
+                'total_overlapping_hours': res.get('total_overlapping_hours', 0),
                 'horizon_hours': res['horizon_hours'],
                 'n_boots': res['n_boots'],
                 'actual_coverage_pct': round(res['actual_coverage'], 1),
             }
             results.append(row)
             
-            # Incremental save every 10 pairs + final save (sorted by lag1_acf)
             if idx % 10 == 0 or idx == total:
                 df = pd.DataFrame(results)
-                df = df.sort_values(by='lag1_acf', ascending=True)
+                df = df.sort_values(by='lag1_acf', ascending=True, na_position='last')
                 df.to_csv(CONFIG['output_csv'], index=False)
                 print(f"→ saved ({len(results)} rows, sorted by lag1_acf)")
             else:
                 print("✓")
                 
+        # ==================== NEW: ROBUST EXCEPTION HANDLING ====================
         except Exception as e:
-            if CONFIG['skip_missing_data'] and "FileNotFoundError" in str(type(e).__name__):
-                print("⚠️  skipped (missing price CSV)")
+            err_str = str(e)
+            if CONFIG['skip_missing_data'] and (
+                "FileNotFoundError" in str(type(e).__name__) or
+                "SVD did not converge" in err_str or
+                "LinAlgError" in err_str or
+                "invalid price data" in err_str.lower()
+            ):
+                print("⚠️  skipped (missing or bad price data)")
             else:
                 print(f"❌ ERROR: {e}")
+        # =====================================================================
     
-    # Final save (already sorted)
     final_df = pd.DataFrame(results)
-    final_df = final_df.sort_values(by='lag1_acf', ascending=True)
+    final_df = final_df.sort_values(by='lag1_acf', ascending=True, na_position='last')
     final_df.to_csv(CONFIG['output_csv'], index=False)
     
     print(f"\n🎉 DONE! Full results saved to → {CONFIG['output_csv']}")

@@ -2,6 +2,7 @@
 """
 fetch_gecko_price_history_refactored.py
 Refactored + Linux-only * masking (identical to fetch_top_tokens.py)
+NOW WITH HIGH-PRECISION SAVING FOR MICRO-CAP / MEME TOKENS
 """
 
 import sys
@@ -32,13 +33,13 @@ def get_masked_input(prompt: str = "Enter your CoinGecko Pro API key: ") -> str:
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
-        tty.setcbreak(fd)                    # more stable than setraw
+        tty.setcbreak(fd)
         print(prompt, end='', flush=True)
         password = ""
         while True:
             ch = sys.stdin.read(1)
             if ch in ('\n', '\r'):
-                print()                      # clean new line
+                print()
                 break
             elif ch == '\x7f':               # Backspace
                 if password:
@@ -148,10 +149,16 @@ def fetch_price_history_for_token(token_input: str, months: int, api_key: str) -
 
     df = pd.DataFrame(all_data)
     df = df.drop_duplicates(subset=["datetime"]).sort_values("datetime").reset_index(drop=True)
-    df["price_usd"] = df["price_usd"].round(8)
     df["datetime"] = pd.to_datetime(df["datetime"])
 
-    df.to_csv(output_file, index=False)
+    # ==================== NEW: HIGH-PRECISION SAVE (Option B) ====================
+    # This fixes the BABYDOGE / micro-cap zero problem once and for all
+    print(f"   Saving with full double-precision (%.18e) — tiny prices preserved")
+    if (df["price_usd"] < 1e-8).any():
+        print(f"   ⚠️  Detected ultra-low prices (< 1e-8) — using scientific notation")
+
+    df.to_csv(output_file, index=False, float_format='%.18e')
+    # ============================================================================
 
     print(f"\n🎉 SUCCESS! Saved {len(df):,} hourly price points")
     print(f"   File: {output_file}")
@@ -162,10 +169,11 @@ def fetch_price_history_for_token(token_input: str, months: int, api_key: str) -
     return df
 
 
+# (The rest of the file — fetch_price_history_for_tokens, get_api_key, main — is unchanged)
 def fetch_price_history_for_tokens(token_list: list[str], months: int, api_key: str) -> dict[str, pd.DataFrame]:
     """Function #3: Batch of tokens → hourly price history for each."""
     results = {}
-    tokens_df = load_token_mapping()  # loaded once for the whole batch
+    tokens_df = load_token_mapping()
 
     for token in token_list:
         print(f"\n{'='*60}\nProcessing token: {token.upper()}\n{'='*60}")
@@ -196,13 +204,10 @@ def get_api_key() -> str:
 def main():
     """CLI entry point — now supports single token OR list of tokens + optional months."""
     if len(sys.argv) == 1:
-        # No arguments → use defaults
         token_list = [CONFIG["default_token"].lower().strip()]
         months = CONFIG["default_months"]
         print(f"ℹ️  No arguments provided → Using CONFIG defaults: {token_list[0].upper()} for {months} month(s)")
-
     else:
-        # Check if the LAST argument looks like a number → treat it as months
         if sys.argv[-1].isdigit():
             months = int(sys.argv[-1])
             token_list = [arg.strip().lower() for arg in sys.argv[1:-1]]
@@ -210,7 +215,6 @@ def main():
             months = CONFIG["default_months"]
             token_list = [arg.strip().lower() for arg in sys.argv[1:]]
 
-        # Edge case: user only passed a number (e.g. "python script.py 6")
         if not token_list:
             token_list = [CONFIG["default_token"].lower().strip()]
             print(f"⚠️  Only months provided → using default token '{token_list[0].upper()}' for {months} month(s)")
@@ -220,7 +224,6 @@ def main():
 
     api_key = get_api_key()
 
-    # Use the appropriate function
     if len(token_list) == 1:
         fetch_price_history_for_token(token_list[0], months, api_key)
     else:

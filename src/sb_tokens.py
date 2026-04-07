@@ -28,7 +28,8 @@ DEFAULT_CONFIG = {
 # ============================================================
 
 def load_price(token: str, data_dir: str = None) -> pd.Series:
-    """Load CSV and convert to KST timezone-aware index."""
+    """Load CSV and convert to KST timezone-aware index.
+    NEW: Robust handling for ultra-low prices and precision-loss zeros."""
     if data_dir is None:
         data_dir = DEFAULT_CONFIG['data_dir']
     path = f"{data_dir}/{token}_price_history.csv"
@@ -41,7 +42,22 @@ def load_price(token: str, data_dir: str = None) -> pd.Series:
     df['datetime'] = pd.to_datetime(df['datetime'], format='ISO8601')
     df = df.set_index('datetime')
     df.index = df.index.tz_convert('Asia/Seoul')
-    return df['price_usd'].sort_index()
+    
+    price = df['price_usd'].sort_index()
+
+    # ==================== NEW ROBUSTNESS PATCH ====================
+    # Treat literal zeros as missing if they dominate the file (common precision bug)
+    zero_ratio = (price == 0.0).mean()
+    if zero_ratio > 0.3:
+        print(f"⚠️  {token.upper()} CSV appears to have precision loss "
+              f"({zero_ratio:.1%} zeros). Treating zeros as NaN.")
+        price = price.replace(0.0, np.nan)
+    
+    # Safety floor for ultra-low meme-coin prices (prevents log underflow)
+    price = price.clip(lower=1e-15)
+    # ============================================================
+
+    return price
 
 
 def stationary_bootstrap(series: np.ndarray, n: int, mean_block: int) -> np.ndarray:
@@ -77,9 +93,7 @@ def get_sb_analysis(
     seed: int = 42,
 ) -> dict:
     """
-    Reusable core function.
-    Returns all requested values + extras for convenience.
-    Charts are generated ONLY if draw_charts=True.
+    Reusable core function with full data-quality protection for tiny prices.
     """
     # Merge defaults with overrides
     config = DEFAULT_CONFIG.copy()
@@ -103,9 +117,6 @@ def get_sb_analysis(
     combined = pd.DataFrame({'price0': price0, 'price1': price1}).sort_index()
     combined = combined.resample('h').last()
 
-    # === TOTAL OVERLAPPING HOURS (strict common data points) ===
-    # This is the number of hourly timestamps where BOTH tokens had real price data
-    # (computed on full history intersection, before ffill or n_months slicing)
     total_overlapping_hours = len(combined.dropna(how='any'))
 
     combined = combined.ffill()
@@ -118,19 +129,31 @@ def get_sb_analysis(
     if len(historical) < 48:
         print(f"⚠️  WARNING: Only {len(historical):,} hourly observations available — results may be unreliable.")
 
-    # Log returns
-    log_returns = np.log(historical).diff().dropna().values
+    # ==================== NEW: DATA QUALITY GUARD (prevents SVD crash) ====================
+    lag1_acf = np.nan
+    lag1_slope = np.nan
+    log_returns = np.array([])
 
-    # Lag-1 autocorrelation + regression slope (always computed)
-    lag1_acf = 0.0
-    lag1_slope = 0.0
-    if len(log_returns) > 1:
-        lag1_acf = np.corrcoef(log_returns[:-1], log_returns[1:])[0, 1]
-        if len(log_returns) > 10:
-            x = log_returns[:-1]
-            y = log_returns[1:]
-            slope, _ = np.polyfit(x, y, deg=1)
-            lag1_slope = slope
+    if (historical <= 0).any() or historical.std() < 1e-12:
+        print(f"❌ CRITICAL: Invalid price data for {token0.upper()}/{token1.upper()} "
+              f"(non-positive or near-constant). Skipping lag-1 stats.")
+    else:
+        log_returns = np.log(historical).diff().dropna().values
+        if len(log_returns) > 1:
+            lag1_acf = np.corrcoef(log_returns[:-1], log_returns[1:])[0, 1]
+            if len(log_returns) > 10:
+                x = log_returns[:-1]
+                y = log_returns[1:]
+                if np.std(x) > 1e-12 and np.isfinite(x).all() and np.isfinite(y).all():
+                    try:
+                        slope, _ = np.polyfit(x, y, deg=1)
+                        lag1_slope = float(slope)
+                    except Exception as e:
+                        print(f"⚠️  polyfit failed for {token0.upper()}/{token1.upper()}: {e}")
+                        lag1_slope = np.nan
+                else:
+                    lag1_slope = np.nan
+    # ===================================================================================
 
     # --- Stationary Bootstrap ---
     np.random.seed(seed)
@@ -143,7 +166,7 @@ def get_sb_analysis(
         sim_mins.append(path.min())
         sim_maxs.append(path.max())
 
-    # === BOTH RANGES (zero extra cost) ===
+    # === BOTH RANGES ===
     lower_mult = np.percentile(sim_mins, config['low_percentile'])
     upper_mult = np.percentile(sim_maxs, config['high_percentile'])
 
@@ -155,7 +178,7 @@ def get_sb_analysis(
         (np.array(sim_mins) >= lower_mult) & (np.array(sim_maxs) <= upper_mult)
     ) * 100
 
-    current_price = historical.iloc[-1]
+    current_price = historical.iloc[-1] if len(historical) > 0 else np.nan
 
     results = {
         'token0': token0,
@@ -169,23 +192,23 @@ def get_sb_analysis(
         'lag1_acf': float(lag1_acf),
         'lag1_slope': float(lag1_slope),
         'num_observations': int(len(historical)),
-        'total_overlapping_hours': int(total_overlapping_hours),   # NEW COLUMN
+        'total_overlapping_hours': int(total_overlapping_hours),
         'horizon_hours': int(horizon),
         'n_boots': int(config['n_boots']),
         'actual_coverage': float(actual_coverage),
         'sim_mins': np.array(sim_mins),
         'sim_maxs': np.array(sim_maxs),
-        'log_returns': log_returns,          # needed only if you later want charts
+        'log_returns': log_returns,
         'config': config
     }
 
-    # Optional charts (only when requested)
     if config['draw_charts']:
         _generate_charts(results)
 
     return results
 
 
+# (The rest of the file — _generate_charts, print_analysis, main — is unchanged)
 def _generate_charts(results: dict):
     """Internal helper — called only when draw_charts=True."""
     print(f"\nGenerating and exporting charts for {results['horizon_hours']}h horizon...")
@@ -270,7 +293,9 @@ def _generate_charts(results: dict):
 
         lag1_acf = results['lag1_acf']
         config = results['config']
-        if lag1_acf < config['acf_strong_reversion_threshold']:
+        if np.isnan(lag1_acf):
+            class_txt = "INVALID DATA"
+        elif lag1_acf < config['acf_strong_reversion_threshold']:
             class_txt = "STRONG REVERSION"
         elif lag1_acf < 0:
             class_txt = "mild reversion"
@@ -331,7 +356,9 @@ def print_analysis(results: dict):
     lag1_acf = results['lag1_acf']
     config = results['config']
     print(f"Lag-1 autocorrelation of log returns : {lag1_acf:.4f} ", end="")
-    if lag1_acf < config['acf_strong_reversion_threshold']:
+    if np.isnan(lag1_acf):
+        print("(❌ invalid data)")
+    elif lag1_acf < config['acf_strong_reversion_threshold']:
         print("(🔄 strong reversion tendency)")
     elif lag1_acf < 0:
         print("(🔄 mild reversion tendency)")
@@ -340,6 +367,7 @@ def print_analysis(results: dict):
     else:
         print("(➡️  near random-walk behaviour)")
 
+    # ... rest of print_analysis unchanged (omitted for brevity — copy the original version)
     lower_mult = results['high_conf_lower']
     upper_mult = results['high_conf_upper']
     lower_pct = (lower_mult - 1) * 100
@@ -374,7 +402,6 @@ def main():
     token1 = args.token1 or 'btc'
     n_months = args.n_months
 
-    # CLI always uses charts + prints (original behaviour)
     results = get_sb_analysis(
         token0=token0,
         token1=token1,
