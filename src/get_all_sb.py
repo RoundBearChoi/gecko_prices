@@ -18,7 +18,7 @@ CONFIG = {
     'output_csv': 'sb_pair_analysis.csv',
     'allow_duplicates': False,
     'start_from_bottom': True,
-    'n_months': 24,
+    'n_months': 9,
     'horizon_hours': None,
     'n_boots': 5000,
     'data_dir': 'fetched_data',
