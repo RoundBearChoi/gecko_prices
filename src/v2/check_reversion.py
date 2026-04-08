@@ -7,18 +7,18 @@ warnings.filterwarnings("ignore")
 
 # ========================= CONFIG =========================
 config = {
-    'input_csv': "all_pairs_matched_hourly_prices_8_months.csv",  # CSV file to load
-    'n_months': 8,                        # target months; will use actual data span if shorter
+    'input_csv': "all_pairs_matched_hourly_prices_8_months.csv",
+    'n_months': 8,
     'window_days': 60,                    # rolling window for mean/SD
-    'n_boots': 1000,                      # start with 1000; increase to 5000 later
-    'block_size_hours': 168,              # 7 days – preserves temporal structure
+    'n_boots': 5000,
+    'block_size_hours': 24*7,             # 7 days – preserves temporal structure
     'sd_threshold': 1.0,                  # +-1 SD
     'reversion_hysteresis': 0.5,          # return inside |z| < 0.5 to confirm clean trip
     'min_obs_per_window': 1000,           # skip windows/pairs with too few data
     'use_log_ratio': False,               # False = price ratio A/B (your preference)
-    'output_top_n': 20,                   # how many top pairs to display
-    'analyze_all_pairs': False,           # set True for full 406 pairs (progress will help!)
-    'max_pairs_to_test': 5,             # safety limit when analyze_all_pairs=False
+    'output_top_n': 10,                   # how many top pairs to display
+    'analyze_all_pairs': True,
+    'max_pairs_to_test': 5,               # safety limit when analyze_all_pairs=False
     'progress_step': 20,                  # print progress every N pairs
 }
 
