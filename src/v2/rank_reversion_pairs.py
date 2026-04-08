@@ -2,14 +2,17 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
+from datetime import datetime
 warnings.filterwarnings("ignore")
 
 # ========================= CONFIG =========================
 config = {
-    # Input / Output files
+    # Input / Output files - now dynamic with months
     'input_csv': "pair_reversion_bootstrapped_results_24months.csv",
-    'output_csv': "ranked_reversion_pairs.csv",
-    'combined_chart_file': "reliable_pairs_analysis_charts.png",   # ← Single combined PNG
+    'months': 24,
+    
+    'output_csv_template': "ranked_reversion_pairs_{months}months.csv",
+    'combined_chart_template': "reliable_pairs_analysis_charts_{months}months.png",
     
     # === STABILITY FILTER (Step 1) ===
     'max_boot_cv': 0.130,          # Lower = more stable
@@ -19,8 +22,21 @@ config = {
     # === CHART SETTINGS ===
     'dpi': 180,                    # Higher = sharper images
     'figsize': (16, 7),            # Wider figure for two side-by-side charts
-    'output_top_n': 30,            # How many pairs to show in console
+    'output_top_n': 5,
 }
+
+# ========================= DYNAMIC FILENAMES =========================
+def get_output_filenames(config):
+    months = config['months']
+    output_csv = config['output_csv_template'].format(months=months)
+    combined_chart = config['combined_chart_template'].format(months=months)
+    return output_csv, combined_chart
+
+config['output_csv'], config['combined_chart_file'] = get_output_filenames(config)
+
+print(f"📅 Analysis period: {config['months']} months")
+print(f"Output CSV  → {config['output_csv']}")
+print(f"Output Chart → {config['combined_chart_file']}\n")
 
 # ========================= LOAD DATA =========================
 df = pd.read_csv(config['input_csv'])
@@ -95,7 +111,7 @@ print(ranked_df[display_cols].head(config['output_top_n']).round(3).to_string(in
 
 # ========================= COMBINED CHART =========================
 if len(reliable_df) > 0:
-    print("\nGenerating combined chart for reliable pairs...")
+    print(f"\nGenerating combined chart for reliable pairs ({config['months']} months)...")
     
     fig, axs = plt.subplots(1, 2, figsize=config['figsize'], dpi=config['dpi'])
     
@@ -104,7 +120,8 @@ if len(reliable_df) > 0:
     
     axs[0].bar(range(len(sorted_trips)), sorted_trips['total_full_trips'], 
                color='skyblue', alpha=0.85, edgecolor='navy', linewidth=0.4)
-    axs[0].set_title('Reliable Pairs Ranked by Total Full Trips', fontsize=14, pad=12)
+    axs[0].set_title(f'Reliable Pairs Ranked by Total Full Trips\n({config["months"]} months)', 
+                     fontsize=14, pad=12)
     axs[0].set_xlabel('Rank (Highest → Lowest Trips)', fontsize=11)
     axs[0].set_ylabel('Total Full Trips', fontsize=11)
     
@@ -124,7 +141,7 @@ if len(reliable_df) > 0:
     
     axs[1].bar(range(len(sorted_diff)), sorted_diff['abs_diff'], 
                color='lightcoral', alpha=0.85, edgecolor='darkred', linewidth=0.4)
-    axs[1].set_title('Reliable Pairs Ranked by |diff| (Closest to Bootstrap Mean)', 
+    axs[1].set_title(f'Reliable Pairs Ranked by |diff| (Closest to Bootstrap Mean)\n({config["months"]} months)', 
                      fontsize=14, pad=12)
     axs[1].set_xlabel('Rank (Smallest → Largest |diff|)', fontsize=11)
     axs[1].set_ylabel('|diff| (Observed - Bootstrap Mean)', fontsize=11)
