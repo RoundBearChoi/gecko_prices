@@ -15,7 +15,6 @@ aave
 pepe
 etc
 kcs
-pump
 jup
 bonk
 cake
