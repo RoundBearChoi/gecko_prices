@@ -15,17 +15,15 @@ CONFIG = {
     "KST_TIMEZONE": "Asia/Seoul",
     
     # ==================== VISUAL BAR SETTINGS ====================
-    "BAR_WIDTH": 80,                    # Total width of the bar (recommended: 50-80)
-    "BAR_CHAR_SOL": "█",                # Character for SOL portion (left side)
-    "BAR_CHAR_ORCA": "─",               # Character for ORCA portion (right side)
-    "BAR_BG": "─",                      # Background character for empty space
-    "BAR_SOL_COLOR": "",                # Leave empty for no color
-    "BAR_ORCA_COLOR": "",               # Leave empty for no color
+    "BAR_WIDTH": 80,
+    "BAR_CHAR_SOL": "█",
+    "BAR_CHAR_ORCA": "─",
+    "BAR_BG": "─",
     
     # Label settings
-    "SHOW_HEADER_LABELS": True,         # Show "SOL" and "ORCA" above the bar
-    "SHOW_50_PERCENT_MARKER": True,     # Show centered 50% line
-    "PERCENT_PRECISION": 1,             # Decimal places for percentages (0 or 1 recommended)
+    "SHOW_HEADER_LABELS": True,
+    "SHOW_50_PERCENT_MARKER": True,
+    "PERCENT_PRECISION": 1,
 }
 # ================================================================
 
@@ -71,69 +69,54 @@ def get_prices() -> Dict[str, float]:
 
 def print_portfolio_bar(orca_ratio: float, sol_balance: float, orca_balance: float, 
                        sol_price: float, orca_price: float):
-    """Print a clean portfolio allocation bar with 50:50 rebalancing suggestion."""
+    """Print portfolio allocation bar + smart 50:50 rebalancing advice."""
     sol_ratio = 1.0 - orca_ratio
     width = CONFIG["BAR_WIDTH"]
     
-    # Calculate blocks for the bar
     sol_blocks = int(round(sol_ratio * width))
     orca_blocks = width - sol_blocks
     
-    # Build the bar
-    bar = (
-        CONFIG["BAR_CHAR_SOL"] * sol_blocks +
-        CONFIG["BAR_CHAR_ORCA"] * orca_blocks
-    )
+    bar = CONFIG["BAR_CHAR_SOL"] * sol_blocks + CONFIG["BAR_CHAR_ORCA"] * orca_blocks
     
-    # Format percentages
     precision = CONFIG["PERCENT_PRECISION"]
     sol_percent = f"{sol_ratio*100:.{precision}f}% SOL"
     orca_percent = f"{orca_ratio*100:.{precision}f}% ORCA"
     
     print("\n📊 Portfolio Allocation Visual:")
     
-    # Header labels (SOL ........ ORCA)
     if CONFIG["SHOW_HEADER_LABELS"]:
         header_padding = " " * (width - 10)
         print(f"   SOL{header_padding}ORCA")
     
-    # The actual bar
     print(f"   {bar}")
     
-    # Percentage labels with smart spacing
     total_label_len = len(sol_percent) + len(orca_percent)
     spacing = width - total_label_len + 6
     label_line = f"   {sol_percent}{' ' * spacing}{orca_percent}"
     print(label_line)
     
-    # Centered 50% marker
     if CONFIG["SHOW_50_PERCENT_MARKER"]:
         print(f"   {'50%':^{width}}")
 
     # ==================== 50:50 REBALANCING SUGGESTION ====================
     total_value_usd = sol_balance * sol_price + orca_balance * orca_price
-    if total_value_usd > 0.01:  # Avoid division issues with tiny portfolios
-        target_value_each = total_value_usd / 2.0
-        
+    if total_value_usd > 1.0:  # Only show meaningful suggestion
+        target_each = total_value_usd / 2.0
         sol_value = sol_balance * sol_price
         orca_value = orca_balance * orca_price
         
-        diff = abs(sol_value - target_value_each)
-        
-        if diff < 0.50:  # Less than $0.50 difference → practically balanced
+        if abs(sol_value - target_each) < 0.50:
             print("   ✅ Portfolio is already perfectly balanced at ~50:50")
-        elif sol_value > target_value_each:
-            # Too much SOL → suggest swapping SOL for ORCA
-            excess_value = sol_value - target_value_each
-            orca_to_buy = excess_value / orca_price
-            print(f"   🔄 Swap ~{orca_to_buy:,.4f} ORCA worth of SOL to reach exact 50:50")
+        elif sol_value > target_each:
+            excess = sol_value - target_each
+            orca_to_buy = excess / orca_price
+            print(f"   🔄 To reach 50:50 → Swap ~{orca_to_buy:,.4f} ORCA worth of SOL")
         else:
-            # Too much ORCA → suggest swapping ORCA for SOL
-            excess_value = orca_value - target_value_each
-            sol_to_buy = excess_value / sol_price
-            print(f"   🔄 Swap ~{sol_to_buy:,.6f} SOL worth of ORCA to reach exact 50:50")
+            excess = orca_value - target_each
+            sol_to_buy = excess / sol_price
+            print(f"   🔄 To reach 50:50 → Swap ~{sol_to_buy:,.6f} SOL worth of ORCA")
     else:
-        print("   ⚠️  Total portfolio value too low for meaningful rebalancing suggestion")
+        print("   ⚠️  Portfolio value too small for rebalancing suggestion")
     # =====================================================================
 
 
@@ -158,27 +141,22 @@ def main() -> None:
         orca_value_usd = orca_balance * prices["orca"]
         total_value_usd = sol_value_usd + orca_value_usd
 
-        # Equivalents using USD as the common base
         sol_equivalent = sol_balance + (orca_value_usd / prices["sol"]) if prices["sol"] > 0 else sol_balance
         orca_equivalent = orca_balance + (sol_value_usd / prices["orca"]) if prices["orca"] > 0 else orca_balance
 
-        # Price ratios
         sol_per_orca = prices["sol"] / prices["orca"] if prices["orca"] > 0 else 0.0
         orca_per_sol = prices["orca"] / prices["sol"] if prices["sol"] > 0 else 0.0
 
-        # Portfolio ratios
         portfolio_orca_ratio = orca_value_usd / total_value_usd if total_value_usd > 0 else 0.0
-        portfolio_sol_ratio = sol_value_usd / total_value_usd if total_value_usd > 0 else 0.0
 
         # KST timestamp
         kst_tz = zoneinfo.ZoneInfo(CONFIG["KST_TIMEZONE"])
         now_kst = datetime.now(kst_tz)
         timestamp_str = now_kst.strftime("%Y-%m-%d %H:%M:%S %Z")
-        timestamp_iso = now_kst.isoformat()
 
-        # CSV row (wallet address omitted for privacy)
+        # Save to CSV
         row = {
-            "timestamp_kst": timestamp_iso,
+            "timestamp_kst": now_kst.isoformat(),
             "readable_time_kst": timestamp_str,
             "sol_balance": round(sol_balance, 9),
             "orca_balance": round(orca_balance, 9),
@@ -192,10 +170,9 @@ def main() -> None:
             "sol_per_orca": round(sol_per_orca, 6),
             "orca_per_sol": round(orca_per_sol, 8),
             "portfolio_orca_ratio": round(portfolio_orca_ratio, 6),
-            "portfolio_sol_ratio": round(portfolio_sol_ratio, 6),
+            "portfolio_sol_ratio": round(1 - portfolio_orca_ratio, 6),
         }
 
-        # Save to CSV
         fieldnames = list(row.keys())
         file_exists = os.path.isfile(CONFIG["CSV_FILENAME"])
         with open(CONFIG["CSV_FILENAME"], "a", newline="", encoding="utf-8") as f:
@@ -207,7 +184,6 @@ def main() -> None:
                 print(f"📄 Appended to: {CONFIG['CSV_FILENAME']}")
             writer.writerow(row)
 
-        # Console output
         print("✅ SUCCESS!")
         print(f"   📄 Data saved to: {CONFIG['CSV_FILENAME']}")
         print(f"\n🕒 Time (KST): {timestamp_str}")
@@ -217,7 +193,7 @@ def main() -> None:
         print(f"   ORCA  : {orca_balance:,.6f} ORCA (${orca_value_usd:,.2f})")
         print(f"   TOTAL : ${total_value_usd:,.2f}")
 
-        # Visual portfolio bar + rebalancing suggestion
+        # Visual bar + rebalancing advice
         print_portfolio_bar(
             portfolio_orca_ratio,
             sol_balance,
