@@ -69,7 +69,7 @@ def get_prices() -> Dict[str, float]:
 
 def print_portfolio_bar(orca_ratio: float, sol_balance: float, orca_balance: float, 
                        sol_price: float, orca_price: float):
-    """Print portfolio allocation bar + smart 50:50 rebalancing advice."""
+    """Print portfolio allocation bar + smart 50:50 rebalancing advice (FINAL user-requested format)."""
     sol_ratio = 1.0 - orca_ratio
     width = CONFIG["BAR_WIDTH"]
     
@@ -98,23 +98,26 @@ def print_portfolio_bar(orca_ratio: float, sol_balance: float, orca_balance: flo
     if CONFIG["SHOW_50_PERCENT_MARKER"]:
         print(f"   {'50%':^{width}}")
 
-    # ==================== 50:50 REBALANCING SUGGESTION ====================
+    # ==================== 50:50 REBALANCING SUGGESTION (FINAL FORMAT) ====================
     total_value_usd = sol_balance * sol_price + orca_balance * orca_price
     if total_value_usd > 1.0:  # Only show meaningful suggestion
         target_each = total_value_usd / 2.0
         sol_value = sol_balance * sol_price
         orca_value = orca_balance * orca_price
+        excess_usd = abs(sol_value - target_each)
         
         if abs(sol_value - target_each) < 0.50:
             print("   ✅ Portfolio is already perfectly balanced at ~50:50")
         elif sol_value > target_each:
-            excess = sol_value - target_each
-            orca_to_buy = excess / orca_price
-            print(f"   🔄 To reach 50:50 → Swap ~{orca_to_buy:,.4f} ORCA worth of SOL")
+            # Too much SOL → sell SOL, buy ORCA
+            sol_to_sell = excess_usd / sol_price
+            orca_to_buy = excess_usd / orca_price
+            print(f"   🔄 To reach 50:50 → Sell ~{sol_to_sell:,.6f} SOL (~${excess_usd:,.2f} USD) to buy ~{orca_to_buy:,.4f} ORCA")
         else:
-            excess = orca_value - target_each
-            sol_to_buy = excess / sol_price
-            print(f"   🔄 To reach 50:50 → Swap ~{sol_to_buy:,.6f} SOL worth of ORCA")
+            # Too much ORCA → sell ORCA, buy SOL
+            orca_to_sell = excess_usd / orca_price
+            sol_to_buy = excess_usd / sol_price
+            print(f"   🔄 To reach 50:50 → Sell ~{orca_to_sell:,.4f} ORCA (~${excess_usd:,.2f} USD) to buy ~{sol_to_buy:,.6f} SOL")
     else:
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
     # =====================================================================
