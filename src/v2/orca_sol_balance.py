@@ -15,7 +15,7 @@ CONFIG = {
     "KST_TIMEZONE": "Asia/Seoul",
     
     # ==================== VISUAL BAR SETTINGS ====================
-    "BAR_WIDTH": 60,                    # Total width of the bar (recommended: 50-80)
+    "BAR_WIDTH": 80,                    # Total width of the bar (recommended: 50-80)
     "BAR_CHAR_SOL": "█",                # Character for SOL portion (left side)
     "BAR_CHAR_ORCA": "─",               # Character for ORCA portion (right side)
     "BAR_BG": "─",                      # Background character for empty space
