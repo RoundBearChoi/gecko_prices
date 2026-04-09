@@ -7,7 +7,7 @@ CONFIG = {
     'sol_file': 'sol_price_history.csv',      # no "fetched_data/" needed
     'orca_file': 'orca_price_history.csv',    # no "fetched_data/" needed
     'output_file': 'orca_sol_price_chart.png',
-    'ma_window': 24*7*4,
+    'ma_window': 24*7*3,
     'dpi': 150,
     'figsize': (16, 8),
     'title': None,                            # will be set dynamically
@@ -15,6 +15,7 @@ CONFIG = {
     'ylabel': 'ORCA per SOL',
     'line_color': '#1f77b4',                  # blue for raw ratio
     'ma_color': '#ff7f0e',                    # orange for MA
+    'ma_linewidth': 1.5,
     'alpha': 0.75,
     'grid_style': 'whitegrid',
     'start_date': None,                       # e.g. '2025-01-01' to zoom
@@ -80,12 +81,13 @@ sns.set_style(CONFIG['grid_style'])
 plt.plot(df.index, df['orca_sol'],
          label='ORCA/SOL Ratio',
          color=CONFIG['line_color'],
-         linewidth=1.5,
+         linewidth=1.5,                    # raw ratio line thickness (unchanged)
          alpha=CONFIG['alpha'])
+
 plt.plot(df.index, df['ma'],
          label=f'{CONFIG["ma_window"]}-Period Moving Average',
          color=CONFIG['ma_color'],
-         linewidth=2.5)
+         linewidth=CONFIG['ma_linewidth'])  # ← now fully configurable via CONFIG
 
 plt.title(CONFIG['title'], fontsize=18, pad=20, fontweight='bold')
 plt.xlabel(CONFIG['xlabel'], fontsize=14)
