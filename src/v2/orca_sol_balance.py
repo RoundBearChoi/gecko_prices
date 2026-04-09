@@ -13,6 +13,19 @@ CONFIG = {
     "COINGECKO_IDS": "solana,orca",
     "VS_CURRENCY": "usd",
     "KST_TIMEZONE": "Asia/Seoul",
+    
+    # ==================== VISUAL BAR SETTINGS ====================
+    "BAR_WIDTH": 60,                    # Total width of the bar (recommended: 50-80)
+    "BAR_CHAR_SOL": "█",                # Character for SOL portion (left side)
+    "BAR_CHAR_ORCA": "─",               # Character for ORCA portion (right side)
+    "BAR_BG": "─",                      # Background character for empty space
+    "BAR_SOL_COLOR": "",                # Leave empty for no color (or use ANSI if desired later)
+    "BAR_ORCA_COLOR": "",               # Leave empty for no color
+    
+    # Label settings
+    "SHOW_HEADER_LABELS": True,         # Show "SOL" and "ORCA" above the bar
+    "SHOW_50_PERCENT_MARKER": True,     # Show centered 50% line
+    "PERCENT_PRECISION": 1,             # Decimal places for percentages (0 or 1 recommended)
 }
 # ================================================================
 
@@ -56,9 +69,51 @@ def get_prices() -> Dict[str, float]:
     }
 
 
+def print_portfolio_bar(orca_ratio: float):
+    """Print a clean, professional portfolio allocation bar with full config support."""
+    sol_ratio = 1.0 - orca_ratio
+    width = CONFIG["BAR_WIDTH"]
+    
+    # Calculate number of blocks for each side
+    sol_blocks = int(round(sol_ratio * width))
+    orca_blocks = width - sol_blocks
+    
+    # Build the bar
+    bar = (
+        CONFIG["BAR_CHAR_SOL"] * sol_blocks +
+        CONFIG["BAR_BG"] * 0 +                    # No middle gap for clean look
+        CONFIG["BAR_CHAR_ORCA"] * orca_blocks
+    )
+    
+    # Format percentages
+    precision = CONFIG["PERCENT_PRECISION"]
+    sol_percent = f"{sol_ratio*100:.{precision}f}% SOL"
+    orca_percent = f"{orca_ratio*100:.{precision}f}% ORCA"
+    
+    print("\n📊 Portfolio Allocation Visual:")
+    
+    # Header labels (SOL ........ ORCA)
+    if CONFIG["SHOW_HEADER_LABELS"]:
+        header_padding = " " * (width - 10)
+        print(f"   SOL{header_padding}ORCA")
+    
+    # The actual bar
+    print(f"   {bar}")
+    
+    # Percentage labels with smart spacing
+    total_label_len = len(sol_percent) + len(orca_percent)
+    spacing = width - total_label_len + 6   # +6 gives nice breathing room
+    label_line = f"   {sol_percent}{' ' * spacing}{orca_percent}"
+    print(label_line)
+    
+    # Centered 50% marker
+    if CONFIG["SHOW_50_PERCENT_MARKER"]:
+        print(f"   {'50%':^{width}}")
+
+
 def main() -> None:
     print("🔍 Solana + ORCA Balance & Price Checker (KST)")
-    print("=" * 80)
+    print("=" * 85)
     
     address = input("\nEnter your Solana wallet address (base58): ").strip()
     if not address:
@@ -66,28 +121,26 @@ def main() -> None:
         return
 
     print(f"\n📍 Wallet: {address}")
-    print("⏳ Fetching data...\n")
+    print("⏳ Fetching data from Solana RPC and CoinGecko...\n")
 
     try:
         sol_balance = get_sol_balance(CONFIG["RPC_URL"], address)
         orca_balance = get_orca_balance(CONFIG["RPC_URL"], address, CONFIG["ORCA_MINT"])
         prices = get_prices()
 
-        # Calculate USD values first (USD is used as the common base)
         sol_value_usd = sol_balance * prices["sol"]
         orca_value_usd = orca_balance * prices["orca"]
         total_value_usd = sol_value_usd + orca_value_usd
 
-        # Hypothetical equivalents using USD as the intermediate base (most accurate method)
-        # This avoids directional bias from using only sol_per_orca or orca_per_sol
+        # Equivalents using USD as the common base
         sol_equivalent = sol_balance + (orca_value_usd / prices["sol"]) if prices["sol"] > 0 else sol_balance
         orca_equivalent = orca_balance + (sol_value_usd / prices["orca"]) if prices["orca"] > 0 else orca_balance
 
-        # Price ratios for display only
-        sol_per_orca = prices["sol"] / prices["orca"] if prices["orca"] > 0 else 0.0   # Large number
-        orca_per_sol = prices["orca"] / prices["sol"] if prices["sol"] > 0 else 0.0   # Small number
+        # Price ratios
+        sol_per_orca = prices["sol"] / prices["orca"] if prices["orca"] > 0 else 0.0
+        orca_per_sol = prices["orca"] / prices["sol"] if prices["sol"] > 0 else 0.0
 
-        # Portfolio allocation ratios
+        # Portfolio ratios
         portfolio_orca_ratio = orca_value_usd / total_value_usd if total_value_usd > 0 else 0.0
         portfolio_sol_ratio = sol_value_usd / total_value_usd if total_value_usd > 0 else 0.0
 
@@ -97,7 +150,7 @@ def main() -> None:
         timestamp_str = now_kst.strftime("%Y-%m-%d %H:%M:%S %Z")
         timestamp_iso = now_kst.isoformat()
 
-        # CSV row (no wallet address)
+        # CSV row (wallet address omitted for privacy)
         row = {
             "timestamp_kst": timestamp_iso,
             "readable_time_kst": timestamp_str,
@@ -133,12 +186,15 @@ def main() -> None:
         print(f"   📄 Data saved to: {CONFIG['CSV_FILENAME']}")
         print(f"\n🕒 Time (KST): {timestamp_str}")
         
-        print("\n📊 Balances:")
+        print("\n📊 Current Balances:")
         print(f"   SOL   : {sol_balance:,.6f} SOL  (${sol_value_usd:,.2f})")
         print(f"   ORCA  : {orca_balance:,.6f} ORCA (${orca_value_usd:,.2f})")
         print(f"   TOTAL : ${total_value_usd:,.2f}")
 
-        print("\n🔄 Hypothetical Equivalents (using USD as common base):")
+        # Visual portfolio bar (now fully configurable)
+        print_portfolio_bar(portfolio_orca_ratio)
+
+        print("\n🔄 Hypothetical Equivalents (USD as common base):")
         print(f"   SOL equivalent   : {sol_equivalent:,.6f} SOL")
         print(f"   ORCA equivalent  : {orca_equivalent:,.6f} ORCA")
 
@@ -146,9 +202,9 @@ def main() -> None:
         print(f"   1 SOL  = {sol_per_orca:,.2f} ORCA")
         print(f"   1 ORCA = {orca_per_sol:,.6f} SOL")
 
-        print("\n📊 Portfolio Allocation:")
-        print(f"   ORCA share : {portfolio_orca_ratio:,.4f} ({portfolio_orca_ratio*100:,.2f}%)")
-        print(f"   SOL share  : {portfolio_sol_ratio:,.4f} ({portfolio_sol_ratio*100:,.2f}%)")
+        print("\n💰 Current Prices:")
+        print(f"   SOL  = ${prices['sol']:,.2f}")
+        print(f"   ORCA = ${prices['orca']:,.4f}")
 
     except Exception as e:
         print(f"❌ Error: {e}")
