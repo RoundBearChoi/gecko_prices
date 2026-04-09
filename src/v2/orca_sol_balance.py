@@ -19,7 +19,7 @@ CONFIG = {
     "BAR_CHAR_SOL": "█",                # Character for SOL portion (left side)
     "BAR_CHAR_ORCA": "─",               # Character for ORCA portion (right side)
     "BAR_BG": "─",                      # Background character for empty space
-    "BAR_SOL_COLOR": "",                # Leave empty for no color (or use ANSI if desired later)
+    "BAR_SOL_COLOR": "",                # Leave empty for no color
     "BAR_ORCA_COLOR": "",               # Leave empty for no color
     
     # Label settings
@@ -69,19 +69,19 @@ def get_prices() -> Dict[str, float]:
     }
 
 
-def print_portfolio_bar(orca_ratio: float):
-    """Print a clean, professional portfolio allocation bar with full config support."""
+def print_portfolio_bar(orca_ratio: float, sol_balance: float, orca_balance: float, 
+                       sol_price: float, orca_price: float):
+    """Print a clean portfolio allocation bar with 50:50 rebalancing suggestion."""
     sol_ratio = 1.0 - orca_ratio
     width = CONFIG["BAR_WIDTH"]
     
-    # Calculate number of blocks for each side
+    # Calculate blocks for the bar
     sol_blocks = int(round(sol_ratio * width))
     orca_blocks = width - sol_blocks
     
     # Build the bar
     bar = (
         CONFIG["BAR_CHAR_SOL"] * sol_blocks +
-        CONFIG["BAR_BG"] * 0 +                    # No middle gap for clean look
         CONFIG["BAR_CHAR_ORCA"] * orca_blocks
     )
     
@@ -102,13 +102,39 @@ def print_portfolio_bar(orca_ratio: float):
     
     # Percentage labels with smart spacing
     total_label_len = len(sol_percent) + len(orca_percent)
-    spacing = width - total_label_len + 6   # +6 gives nice breathing room
+    spacing = width - total_label_len + 6
     label_line = f"   {sol_percent}{' ' * spacing}{orca_percent}"
     print(label_line)
     
     # Centered 50% marker
     if CONFIG["SHOW_50_PERCENT_MARKER"]:
         print(f"   {'50%':^{width}}")
+
+    # ==================== 50:50 REBALANCING SUGGESTION ====================
+    total_value_usd = sol_balance * sol_price + orca_balance * orca_price
+    if total_value_usd > 0.01:  # Avoid division issues with tiny portfolios
+        target_value_each = total_value_usd / 2.0
+        
+        sol_value = sol_balance * sol_price
+        orca_value = orca_balance * orca_price
+        
+        diff = abs(sol_value - target_value_each)
+        
+        if diff < 0.50:  # Less than $0.50 difference → practically balanced
+            print("   ✅ Portfolio is already perfectly balanced at ~50:50")
+        elif sol_value > target_value_each:
+            # Too much SOL → suggest swapping SOL for ORCA
+            excess_value = sol_value - target_value_each
+            orca_to_buy = excess_value / orca_price
+            print(f"   🔄 Swap ~{orca_to_buy:,.4f} ORCA worth of SOL to reach exact 50:50")
+        else:
+            # Too much ORCA → suggest swapping ORCA for SOL
+            excess_value = orca_value - target_value_each
+            sol_to_buy = excess_value / sol_price
+            print(f"   🔄 Swap ~{sol_to_buy:,.6f} SOL worth of ORCA to reach exact 50:50")
+    else:
+        print("   ⚠️  Total portfolio value too low for meaningful rebalancing suggestion")
+    # =====================================================================
 
 
 def main() -> None:
@@ -191,8 +217,14 @@ def main() -> None:
         print(f"   ORCA  : {orca_balance:,.6f} ORCA (${orca_value_usd:,.2f})")
         print(f"   TOTAL : ${total_value_usd:,.2f}")
 
-        # Visual portfolio bar (now fully configurable)
-        print_portfolio_bar(portfolio_orca_ratio)
+        # Visual portfolio bar + rebalancing suggestion
+        print_portfolio_bar(
+            portfolio_orca_ratio,
+            sol_balance,
+            orca_balance,
+            prices["sol"],
+            prices["orca"]
+        )
 
         print("\n🔄 Hypothetical Equivalents (USD as common base):")
         print(f"   SOL equivalent   : {sol_equivalent:,.6f} SOL")
