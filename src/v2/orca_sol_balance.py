@@ -14,15 +14,11 @@ CONFIG = {
     "CSV_FILENAME": "solana_orca_balances.csv",  
     
     "ORCA_MINT": "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE",  
-    # Confirmed correct ORCA governance token mint
     
     "COINGECKO_IDS": "solana,orca",  
     "VS_CURRENCY": "usd",  
     
     "KST_TIMEZONE": "Asia/Seoul",
-    
-    # Optional: Add more tokens later here if you want to expand
-    # "EXTRA_TOKENS": {"USDC": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", ...}
 }
 # ================================================================
 
@@ -93,7 +89,7 @@ def get_prices() -> Dict[str, float]:
 
 def main() -> None:
     print("🔍 Solana + ORCA Balance & Price Checker (KST)")
-    print("=" * 60)
+    print("=" * 75)
     
     address = input("\nEnter your Solana wallet address (base58): ").strip()
     
@@ -120,26 +116,32 @@ def main() -> None:
         orca_value = orca_balance * prices["orca"]
         total_value = sol_value + orca_value
 
-        # NEW: Hypothetical equivalents (cross-conversion using current prices)
-        # These show what your total holdings would be worth if converted entirely to one asset
+        # Hypothetical equivalents (cross-conversion)
         if prices["orca"] > 0:
             orca_equivalent = orca_balance + (sol_balance * prices["sol"] / prices["orca"])
         else:
-            orca_equivalent = orca_balance  # fallback (extremely unlikely)
+            orca_equivalent = orca_balance
         
         if prices["sol"] > 0:
             sol_equivalent = sol_balance + (orca_balance * prices["orca"] / prices["sol"])
         else:
-            sol_equivalent = sol_balance  # fallback
+            sol_equivalent = sol_balance
+
+        # Price ratio: ORCA in terms of SOL
+        orca_sol_price_ratio = prices["orca"] / prices["sol"] if prices["sol"] > 0 else 0.0
+
+        # Portfolio allocation ratios (as decimals 0.0 - 1.0)
+        portfolio_orca_ratio = orca_value / total_value if total_value > 0 else 0.0
+        portfolio_sol_ratio = sol_value / total_value if total_value > 0 else 0.0
+        # Note: portfolio_sol_ratio + portfolio_orca_ratio should always equal 1.0 (within floating point precision)
 
         # KST timezone-aware timestamp
         kst_tz = zoneinfo.ZoneInfo(CONFIG["KST_TIMEZONE"])
         now_kst = datetime.now(kst_tz)
-        timestamp_str = now_kst.strftime("%Y-%m-%d %H:%M:%S %Z")  # Human-readable + timezone
-        timestamp_iso = now_kst.isoformat()                       # Full ISO with offset for CSV
+        timestamp_str = now_kst.strftime("%Y-%m-%d %H:%M:%S %Z")
+        timestamp_iso = now_kst.isoformat()
 
-        # Prepare data row
-        # ✅ Wallet address is deliberately omitted from CSV for privacy
+        # Prepare data row (NO wallet address stored in CSV for privacy)
         row = {
             "timestamp_kst": timestamp_iso,
             "readable_time_kst": timestamp_str,
@@ -150,9 +152,11 @@ def main() -> None:
             "sol_value_usd": round(sol_value, 2),
             "orca_value_usd": round(orca_value, 2),
             "total_value_usd": round(total_value, 2),
-            # NEW COLUMNS
-            "sol_equivalent": round(sol_equivalent, 9),      # Total in SOL terms
-            "orca_equivalent": round(orca_equivalent, 9),    # Total in ORCA terms
+            "sol_equivalent": round(sol_equivalent, 9),
+            "orca_equivalent": round(orca_equivalent, 9),
+            "orca_sol_price_ratio": round(orca_sol_price_ratio, 6),
+            "portfolio_orca_ratio": round(portfolio_orca_ratio, 6),
+            "portfolio_sol_ratio": round(portfolio_sol_ratio, 6),   # NEW
         }
 
         # Write/append to CSV
@@ -165,24 +169,31 @@ def main() -> None:
                 writer.writeheader()
                 print(f"📄 Created new CSV file: {CONFIG['CSV_FILENAME']}")
             else:
-                # If old CSV exists with different columns, it will still append safely
-                # (new columns will be added at the end for future rows)
                 print(f"📄 Appended to existing CSV: {CONFIG['CSV_FILENAME']}")
             writer.writerow(row)
 
-        # Beautiful console output with new equivalents
+        # Beautiful console output
         print("✅ SUCCESS!")
         print(f"   📄 Data appended to: {CONFIG['CSV_FILENAME']}")
         print(f"\n🕒 Time (KST): {timestamp_str}")
+        
         print("\n📊 Current Balances:")
         print(f"   SOL   : {sol_balance:,.6f} SOL   (${sol_value:,.2f} USD)")
         print(f"   ORCA  : {orca_balance:,.6f} ORCA  (${orca_value:,.2f} USD)")
         print(f"   TOTAL : ${total_value:,.2f} USD")
         
-        print("\n🔄 Hypothetical Equivalents (using current prices):")
+        print("\n🔄 Hypothetical Equivalents:")
         print(f"   SOL equivalent  : {sol_equivalent:,.6f} SOL")
         print(f"   ORCA equivalent : {orca_equivalent:,.6f} ORCA")
         
+        print("\n📈 Ratio Metrics:")
+        print(f"   ORCA/SOL Price Ratio     : {orca_sol_price_ratio:,.6f}  "
+              f"(1 ORCA ≈ {orca_sol_price_ratio:,.6f} SOL)")
+        print(f"   Portfolio ORCA Ratio     : {portfolio_orca_ratio:,.4f}  "
+              f"({portfolio_orca_ratio*100:,.2f}% ORCA)")
+        print(f"   Portfolio SOL Ratio      : {portfolio_sol_ratio:,.4f}  "
+              f"({portfolio_sol_ratio*100:,.2f}% SOL)")
+
         print("\n💰 Market Prices:")
         print(f"   SOL   = ${prices['sol']:,.4f} USD")
         print(f"   ORCA  = ${prices['orca']:,.4f} USD")
@@ -191,7 +202,7 @@ def main() -> None:
         print("❌ Timeout: RPC or CoinGecko took too long. Try again or use a faster RPC in CONFIG.")
     except requests.exceptions.RequestException as e:
         print(f"❌ Network/Connection error: {e}")
-        print("💡 Tip: Public Solana RPC can be slow or rate-limited during high traffic.")
+        print("💡 Tip: Public Solana RPC can be slow or rate-limited.")
     except Exception as e:
         print(f"❌ Error: {e}")
         print("   Possible causes: invalid address, RPC issues, or temporary API downtime.")
