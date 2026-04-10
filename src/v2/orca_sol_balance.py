@@ -29,7 +29,7 @@ CONFIG = {
     
     # ==================== LIVE MONITOR SETTINGS ====================
     "REFRESH_INTERVAL": 60,          # seconds
-    "UPDATE_ONCE": True,            # True = one-time run, False = live with countdown
+    "UPDATE_ONCE": False,            # True = one-time run, False = live with countdown
 }
 # ================================================================
 
