@@ -8,7 +8,6 @@ link
 xmr
 ltc
 zec
-tao
 dot
 uni
 okb
@@ -16,14 +15,12 @@ aave
 morpho
 pepe
 etc
-kcs
 jup
 bonk
 cake
-vvv
 fartcoin
 ray
-mx
 1inch
 babydoge
+met
 orca
