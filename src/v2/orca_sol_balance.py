@@ -229,10 +229,6 @@ def countdown(refresh_interval: int):
 
 
 def main() -> None:
-    clear_screen()
-    print("🔴 Solana + ORCA Portfolio Monitor (KST)")
-    print("=" * 90)
-    
     address = input("\nEnter your Solana wallet address (base58): ").strip()
     if not address:
         print("❌ No address entered. Exiting.")
@@ -254,7 +250,7 @@ def main() -> None:
         first_run = True
         try:
             while True:
-                clear_screen()
+                clear_screen()                    # ← clear only happens in live mode
                 fetch_and_display(address, first_run=first_run)
                 first_run = False
 
