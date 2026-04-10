@@ -29,7 +29,7 @@ CONFIG = {
     
     # ==================== LIVE MONITOR SETTINGS ====================
     "REFRESH_INTERVAL": 60,          # seconds
-    "UPDATE_ONCE": False,            # True = one-time run, False = live with countdown
+    "UPDATE_ONCE": True,            # True = one-time run, False = live with countdown
 }
 # ================================================================
 
@@ -116,7 +116,7 @@ def print_portfolio_bar(orca_ratio: float, sol_balance: float, orca_balance: flo
         excess_usd = abs(sol_value - target_each)
         
         if abs(sol_value - target_each) < 0.50:
-            print("   ✅ Portfolio is already perfectly balanced at ~50:50")
+            print("   ✅ Portfolio is already balanced at ~50:50")
         elif sol_value > target_each:
             sol_to_sell = excess_usd / sol_price
             orca_to_buy = excess_usd / orca_price
