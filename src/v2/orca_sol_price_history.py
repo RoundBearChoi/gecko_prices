@@ -7,12 +7,11 @@ CONFIG = {
     'sol_file': 'sol_price_history.csv',      # no "fetched_data/" needed
     'orca_file': 'orca_price_history.csv',    # no "fetched_data/" needed
     'output_file': 'orca_sol_price_chart.png',
-    'ma_window': 24*7*3,
+    'ma_window': 24*7*3,                      # 504 periods ≈ 3 weeks of hourly data
     'dpi': 150,
     'figsize': (16, 8),
-    'title': None,                            # will be set dynamically
     'xlabel': 'Date',
-    'ylabel': 'ORCA per SOL',
+    'ylabel': 'SOL per ORCA',                 # ← FIXED: now matches the data
     'line_color': '#1f77b4',                  # blue for raw ratio
     'ma_color': '#ff7f0e',                    # orange for MA
     'ma_linewidth': 1.5,
@@ -22,8 +21,8 @@ CONFIG = {
     'end_date': None,
 }
 
-# Dynamically build title so it always matches the MA window
-CONFIG['title'] = f'ORCA/SOL Price Ratio with {CONFIG["ma_window"]}-Period Moving Average (2024-2026)'
+# Clear title that matches what is actually plotted
+CONFIG['title'] = f'ORCA/SOL Price Ratio (SOL per ORCA) with {CONFIG["ma_window"]}-Period Moving Average (2024-2026)'
 # ======================================================
 
 # Helper: automatically add fetched_data/ prefix if missing
@@ -66,28 +65,29 @@ df = pd.merge_asof(
     direction='nearest'
 )
 
-# Compute ratio + longer-term moving average
-df['orca_sol'] = df['price_usd_orca'] / df['price_usd_sol']
-df['ma'] = df['orca_sol'].rolling(window=CONFIG['ma_window'], min_periods=1).mean()
+# Compute ratio (SOL per ORCA) + moving average
+# This is the standard ORCA/SOL pair price on Solana DEXes
+df['sol_per_orca'] = df['price_usd_orca'] / df['price_usd_sol']
+df['ma'] = df['sol_per_orca'].rolling(window=CONFIG['ma_window'], min_periods=1).mean()
 
 # Summary stats
-print("\nORCA/SOL Price Summary:")
-print(df['orca_sol'].describe())
+print("\nORCA/SOL Price Summary (SOL per ORCA):")
+print(df['sol_per_orca'].describe())
 
 # Plot
 plt.figure(figsize=CONFIG['figsize'])
 sns.set_style(CONFIG['grid_style'])
 
-plt.plot(df.index, df['orca_sol'],
+plt.plot(df.index, df['sol_per_orca'],
          label='ORCA/SOL Ratio',
          color=CONFIG['line_color'],
-         linewidth=1.5,                    # raw ratio line thickness (unchanged)
+         linewidth=1.5,
          alpha=CONFIG['alpha'])
 
 plt.plot(df.index, df['ma'],
          label=f'{CONFIG["ma_window"]}-Period Moving Average',
          color=CONFIG['ma_color'],
-         linewidth=CONFIG['ma_linewidth'])  # ← now fully configurable via CONFIG
+         linewidth=CONFIG['ma_linewidth'])
 
 plt.title(CONFIG['title'], fontsize=18, pad=20, fontweight='bold')
 plt.xlabel(CONFIG['xlabel'], fontsize=14)
@@ -103,5 +103,5 @@ plt.close()
 print(f"\n✅ Chart saved as '{CONFIG['output_file']}' (DPI={CONFIG['dpi']})")
 print(f"   Data points: {len(df):,}")
 print(f"   Date range: {df.index.min().date()} – {df.index.max().date()}")
-print(f"   Latest ratio: {df['orca_sol'].iloc[-1]:.6f}")
+print(f"   Latest ORCA/SOL: {df['sol_per_orca'].iloc[-1]:.6f} SOL per ORCA")
 print(f"   MA window used: {CONFIG['ma_window']} periods (~{CONFIG['ma_window']//24} days)")
