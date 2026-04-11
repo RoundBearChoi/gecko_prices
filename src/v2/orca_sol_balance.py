@@ -79,7 +79,7 @@ def clear_screen():
 
 def print_portfolio_bar(orca_ratio: float, sol_balance: float, orca_balance: float, 
                        sol_price: float, orca_price: float):
-    """Print portfolio allocation bar + smart 50:50 rebalancing advice."""
+    """Print portfolio allocation bar + 50:50 rebalancing advice (matches pepe_btcb_balance.py style)."""
     sol_ratio = 1.0 - orca_ratio
     width = CONFIG["BAR_WIDTH"]
     
@@ -112,19 +112,16 @@ def print_portfolio_bar(orca_ratio: float, sol_balance: float, orca_balance: flo
     if total_value_usd > 1.0:
         target_each = total_value_usd / 2.0
         sol_value = sol_balance * sol_price
-        orca_value = orca_balance * orca_price
-        excess_usd = abs(sol_value - target_each)
+        excess_usd = sol_value - target_each
         
-        if abs(sol_value - target_each) < 0.50:
-            print("   ✅ Portfolio is already balanced at ~50:50")
-        elif sol_value > target_each:
+        if excess_usd >= 0:
             sol_to_sell = excess_usd / sol_price
             orca_to_buy = excess_usd / orca_price
-            print(f"   🔄 To reach 50:50 → Sell ~{sol_to_sell:,.6f} SOL (~${excess_usd:,.2f} USD) to buy ~{orca_to_buy:,.4f} ORCA")
+            print(f"   🔄 To reach perfect 50:50 → Sell ~{sol_to_sell:,.6f} SOL (~${excess_usd:,.2f} USD) to buy ~{orca_to_buy:,.4f} ORCA")
         else:
-            orca_to_sell = excess_usd / orca_price
-            sol_to_buy = excess_usd / sol_price
-            print(f"   🔄 To reach 50:50 → Sell ~{orca_to_sell:,.4f} ORCA (~${excess_usd:,.2f} USD) to buy ~{sol_to_buy:,.6f} SOL")
+            orca_to_sell = abs(excess_usd) / orca_price
+            sol_to_buy = abs(excess_usd) / sol_price
+            print(f"   🔄 To reach perfect 50:50 → Sell ~{orca_to_sell:,.4f} ORCA (~${abs(excess_usd):,.2f} USD) to buy ~{sol_to_buy:,.6f} SOL")
     else:
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
 
