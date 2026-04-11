@@ -28,7 +28,7 @@ CONFIG = {
     "PERCENT_PRECISION": 1,
     
     # ==================== LIVE MONITOR SETTINGS ====================
-    "REFRESH_INTERVAL": 60,          # seconds
+    "REFRESH_INTERVAL": 60*5,
     "UPDATE_ONCE": False,            # True = one-time run, False = live with countdown
 }
 # ================================================================

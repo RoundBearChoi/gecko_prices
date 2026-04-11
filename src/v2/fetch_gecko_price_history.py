@@ -26,7 +26,7 @@ CONFIG = {
     "chunk_days": 90,                   # Safe max for hourly data
     "top_tokens_file": "subjective_tokens_ranked.csv",
     "sleep_between_calls": 1.2,
-    "default_months": 1,                # Change this if you want more/less history by default
+    "default_months": 24,                # Change this if you want more/less history by default
 }
 # =======================================================
 
