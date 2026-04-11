@@ -1,0 +1,13 @@
+btc
+eth
+bnb
+sol
+doge
+xmr
+zec
+ltc
+pepe
+etc
+pump
+bonk
+fartcoin

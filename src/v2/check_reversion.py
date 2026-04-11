@@ -8,9 +8,9 @@ warnings.filterwarnings("ignore")
 # ========================= CONFIG =========================
 config = {
     # MAKE SURE TO MATCH CSV MONTHS TO N_MONTHS
-    'input_csv': "all_pairs_matched_hourly_prices_24_months.csv",
-    'n_months': 24,
-    'window_days': 90,                    # rolling window for mean/SD
+    'input_csv': "all_pairs_matched_hourly_prices_8_months.csv",
+    'n_months': 8,
+    'window_days': 30,                    # rolling window for mean/SD
     'n_boots': 5000,
     'block_size_hours': 24*7,             # 7 days – preserves temporal structure
     'sd_threshold': 1.0,                  # +-1 SD

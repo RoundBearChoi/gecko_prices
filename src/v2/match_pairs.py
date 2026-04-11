@@ -3,8 +3,8 @@ from pathlib import Path
 
 # ==================== CONFIG SECTION ====================
 DATA_DIR = Path("fetched_data")
-TOKENS_FILE = "subjective_top_tokens.txt"
-N_MONTHS = 24
+TOKENS_FILE = "subjective_top_tokens_symbol.txt"
+N_MONTHS = 8
 TIME_TOLERANCE_MINUTES = 60
 REVERSE_TOKENS = True            # True = "work our way up from the bottom"
 OUTPUT_FILE = f"all_pairs_matched_hourly_prices_{N_MONTHS}_months.csv"

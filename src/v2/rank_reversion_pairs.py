@@ -8,16 +8,16 @@ warnings.filterwarnings("ignore")
 # ========================= CONFIG =========================
 config = {
     # Input / Output files - now dynamic with months
-    'input_csv': "pair_reversion_bootstrapped_results_24months.csv",
-    'months': 24,
+    'input_csv': "pair_reversion_bootstrapped_results_8months.csv",
+    'months': 8,
     
     'output_csv_template': "ranked_reversion_pairs_{months}months.csv",
     'combined_chart_template': "reliable_pairs_analysis_charts_{months}months.png",
     
     # === STABILITY FILTER (Step 1) ===
-    'max_boot_cv': 0.130,          # Lower = more stable
+    'max_boot_cv': 0.20,          # Lower = more stable
     'max_ci_width': 15.0,          # Tighter = more reliable
-    'min_total_trips': 10,
+    'min_total_trips': 8,
     
     # === CHART SETTINGS ===
     'dpi': 180,                    # Higher = sharper images
