@@ -12,8 +12,8 @@ from web3 import Web3
 CONFIG = {
     "RPC_URL": "https://bsc-dataseed.binance.org/",
     "CSV_FILENAME": "btcb_pepe_balances.csv",
-    "BTCB_CONTRACT": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",   # lowercase is fine here
-    "PEPE_CONTRACT": "0x25d887ce7a35172c62febfd67a1856f20faebb00",   # lowercase is fine here
+    "BTCB_CONTRACT": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
+    "PEPE_CONTRACT": "0x25d887ce7a35172c62febfd67a1856f20faebb00",
     "COINGECKO_IDS": "binance-bitcoin,pepe",
     "VS_CURRENCY": "usd",
     "KST_TIMEZONE": "Asia/Seoul",
@@ -64,6 +64,7 @@ def clear_screen():
 
 def print_portfolio_bar(btcb_ratio: float, btcb_balance: float, pepe_balance: float, 
                        btcb_price: float, pepe_price: float):
+    """Portfolio bar + ALWAYS shows exact swap amounts to reach perfect 50:50"""
     pepe_ratio = 1.0 - btcb_ratio
     width = CONFIG["BAR_WIDTH"]
     
@@ -92,23 +93,21 @@ def print_portfolio_bar(btcb_ratio: float, btcb_balance: float, pepe_balance: fl
     if CONFIG["SHOW_50_PERCENT_MARKER"]:
         print(f"   {'50%':^{width}}")
 
+    # === ALWAYS SHOW SWAP AMOUNTS (new behavior you requested) ===
     total_value_usd = btcb_balance * btcb_price + pepe_balance * pepe_price
     if total_value_usd > 1.0:
         target_each = total_value_usd / 2.0
         btcb_value = btcb_balance * btcb_price
-        pepe_value = pepe_balance * pepe_price
-        excess_usd = abs(btcb_value - target_each)
+        excess_usd = btcb_value - target_each
         
-        if abs(btcb_value - target_each) < 0.50:
-            print("   ✅ Portfolio is already balanced at ~50:50")
-        elif btcb_value > target_each:
+        if excess_usd >= 0:
             btcb_to_sell = excess_usd / btcb_price
             pepe_to_buy = excess_usd / pepe_price
-            print(f"   🔄 To reach 50:50 → Sell ~{btcb_to_sell:,.6f} BTCB (~${excess_usd:,.2f} USD) to buy ~{pepe_to_buy:,.0f} PEPE")
+            print(f"   🔄 To reach perfect 50:50 → Sell ~{btcb_to_sell:,.6f} BTCB (~${excess_usd:,.2f} USD) to buy ~{pepe_to_buy:,.0f} PEPE")
         else:
-            pepe_to_sell = excess_usd / pepe_price
-            btcb_to_buy = excess_usd / btcb_price
-            print(f"   🔄 To reach 50:50 → Sell ~{pepe_to_sell:,.0f} PEPE (~${excess_usd:,.2f} USD) to buy ~{btcb_to_buy:,.6f} BTCB")
+            pepe_to_sell = abs(excess_usd) / pepe_price
+            btcb_to_buy = abs(excess_usd) / btcb_price
+            print(f"   🔄 To reach perfect 50:50 → Sell ~{pepe_to_sell:,.0f} PEPE (~${abs(excess_usd):,.2f} USD) to buy ~{btcb_to_buy:,.6f} BTCB")
     else:
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
 
@@ -193,16 +192,14 @@ def countdown(refresh_interval: int):
 
 
 def main() -> None:
-    # Connect to BSC
     w3 = Web3(Web3.HTTPProvider(CONFIG["RPC_URL"]))
     if not w3.is_connected():
         print("❌ Failed to connect to BSC network.")
         return
 
-    # === CRITICAL FIX: Convert contracts to checksum addresses ===
+    # Convert contracts to checksum addresses (keeps it stable)
     CONFIG["BTCB_CONTRACT"] = w3.to_checksum_address(CONFIG["BTCB_CONTRACT"])
     CONFIG["PEPE_CONTRACT"] = w3.to_checksum_address(CONFIG["PEPE_CONTRACT"])
-    # ============================================================
 
     address_input = input("\nEnter your BSC wallet address (0x...): ").strip()
     if not address_input:
