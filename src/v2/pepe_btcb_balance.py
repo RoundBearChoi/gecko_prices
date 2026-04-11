@@ -30,8 +30,8 @@ CONFIG = {
     "PERCENT_PRECISION": 1,
     
     # ==================== LIVE MONITOR SETTINGS ====================
-    "REFRESH_INTERVAL": 60,          # seconds
-    "UPDATE_ONCE": False,            # True = one-time check, False = live mode
+    "REFRESH_INTERVAL": 60,
+    "UPDATE_ONCE": False,
 }
 # ================================================================
 
@@ -64,7 +64,6 @@ def clear_screen():
 
 def print_portfolio_bar(btcb_ratio: float, btcb_balance: float, pepe_balance: float, 
                        btcb_price: float, pepe_price: float):
-    """Portfolio bar + ALWAYS shows exact swap amounts to reach perfect 50:50"""
     pepe_ratio = 1.0 - btcb_ratio
     width = CONFIG["BAR_WIDTH"]
     
@@ -93,7 +92,6 @@ def print_portfolio_bar(btcb_ratio: float, btcb_balance: float, pepe_balance: fl
     if CONFIG["SHOW_50_PERCENT_MARKER"]:
         print(f"   {'50%':^{width}}")
 
-    # === ALWAYS SHOW SWAP AMOUNTS (new behavior you requested) ===
     total_value_usd = btcb_balance * btcb_price + pepe_balance * pepe_price
     if total_value_usd > 1.0:
         target_each = total_value_usd / 2.0
@@ -134,6 +132,13 @@ def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
 
     portfolio_btcb_ratio = btcb_value_usd / total_value_usd if total_value_usd > 0 else 0.0
 
+    # === Equivalents & ratios (exactly like SOL/ORCA) ===
+    btcb_equivalent = btcb_balance + (pepe_value_usd / prices["btcb"]) if prices["btcb"] > 0 else btcb_balance
+    pepe_equivalent = pepe_balance + (btcb_value_usd / prices["pepe"]) if prices["pepe"] > 0 else pepe_balance
+    btcb_per_pepe = prices["btcb"] / prices["pepe"] if prices["pepe"] > 0 else 0.0
+    pepe_per_btcb = prices["pepe"] / prices["btcb"] if prices["btcb"] > 0 else 0.0
+    portfolio_pepe_ratio = 1.0 - portfolio_btcb_ratio
+
     print("\n📊 Current Balances:")
     print(f"   BNB   : {bnb_balance:,.6f} BNB")
     print(f"   BTCB  : {btcb_balance:,.6f} BTCB  (${btcb_value_usd:,.2f})")
@@ -148,10 +153,19 @@ def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
         prices["pepe"]
     )
 
+    print("\n🔄 Hypothetical Equivalents (USD as common base):")
+    print(f"   BTCB equivalent : {btcb_equivalent:,.6f} BTCB")
+    print(f"   PEPE equivalent : {pepe_equivalent:,.0f} PEPE")
+
+    print("\n📈 Price Ratios:")
+    print(f"   1 BTCB = {btcb_per_pepe:,.0f} PEPE")
+    print(f"   1 PEPE = {pepe_per_btcb:.14e} BTCB")   # ← scientific notation for tiny number
+
     print("\n💰 Current Prices:")
     print(f"   BTCB ≈ ${prices['btcb']:,.2f}")
     print(f"   PEPE  = ${prices['pepe']:,.8f}")
 
+    # CSV — now with correct precision for pepe_per_btcb
     if first_run:
         row = {
             "timestamp_kst": now_kst.isoformat(),
@@ -164,7 +178,12 @@ def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
             "btcb_value_usd": round(btcb_value_usd, 2),
             "pepe_value_usd": round(pepe_value_usd, 2),
             "total_value_usd": round(total_value_usd, 2),
+            "btcb_equivalent": round(btcb_equivalent, 9),
+            "pepe_equivalent": round(pepe_equivalent, 2),
+            "btcb_per_pepe": round(btcb_per_pepe, 2),
+            "pepe_per_btcb": round(pepe_per_btcb, 15),      # ← 15 decimals = no more 0.0
             "portfolio_btcb_ratio": round(portfolio_btcb_ratio, 6),
+            "portfolio_pepe_ratio": round(portfolio_pepe_ratio, 6),
         }
         fieldnames = list(row.keys())
         file_exists = os.path.isfile(CONFIG["CSV_FILENAME"])
@@ -197,7 +216,6 @@ def main() -> None:
         print("❌ Failed to connect to BSC network.")
         return
 
-    # Convert contracts to checksum addresses (keeps it stable)
     CONFIG["BTCB_CONTRACT"] = w3.to_checksum_address(CONFIG["BTCB_CONTRACT"])
     CONFIG["PEPE_CONTRACT"] = w3.to_checksum_address(CONFIG["PEPE_CONTRACT"])
 
