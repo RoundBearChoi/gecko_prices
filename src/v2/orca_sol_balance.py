@@ -152,8 +152,9 @@ def fetch_and_display(address: str, first_run: bool = False):
     sol_equivalent = sol_balance + (orca_value_usd / prices["sol"]) if prices["sol"] > 0 else sol_balance
     orca_equivalent = orca_balance + (sol_value_usd / prices["orca"]) if prices["orca"] > 0 else orca_balance
 
-    sol_per_orca = prices["sol"] / prices["orca"] if prices["orca"] > 0 else 0.0
-    orca_per_sol = prices["orca"] / prices["sol"] if prices["sol"] > 0 else 0.0
+    # === CLEARER PRICE RATIOS (intuitive names) ===
+    orca_per_sol = prices["sol"] / prices["orca"] if prices["orca"] > 0 else 0.0   # large number
+    sol_per_orca = prices["orca"] / prices["sol"] if prices["sol"] > 0 else 0.0    # tiny number
 
     portfolio_orca_ratio = orca_value_usd / total_value_usd if total_value_usd > 0 else 0.0
 
@@ -175,14 +176,14 @@ def fetch_and_display(address: str, first_run: bool = False):
     print(f"   ORCA equivalent  : {orca_equivalent:,.6f} ORCA")
 
     print("\n📈 Price Ratios:")
-    print(f"   1 SOL  = {sol_per_orca:,.2f} ORCA")
-    print(f"   1 ORCA = {orca_per_sol:,.6f} SOL")
+    print(f"   1 SOL  = {orca_per_sol:,.2f} ORCA")
+    print(f"   1 ORCA = {sol_per_orca:,.6f} SOL")
 
     print("\n💰 Current Prices:")
     print(f"   SOL  = ${prices['sol']:,.2f}")
     print(f"   ORCA = ${prices['orca']:,.4f}")
 
-    # CSV — always written exactly once
+    # CSV — always written exactly once (with clearer column names)
     if first_run:
         row = {
             "timestamp_kst": now_kst.isoformat(),
@@ -196,8 +197,8 @@ def fetch_and_display(address: str, first_run: bool = False):
             "total_value_usd": round(total_value_usd, 2),
             "sol_equivalent": round(sol_equivalent, 9),
             "orca_equivalent": round(orca_equivalent, 9),
-            "sol_per_orca": round(sol_per_orca, 6),
-            "orca_per_sol": round(orca_per_sol, 8),
+            "orca_per_sol": round(orca_per_sol, 6),      # large number
+            "sol_per_orca": round(sol_per_orca, 8),      # tiny number
             "portfolio_orca_ratio": round(portfolio_orca_ratio, 6),
             "portfolio_sol_ratio": round(1 - portfolio_orca_ratio, 6),
         }

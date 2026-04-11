@@ -132,11 +132,13 @@ def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
 
     portfolio_btcb_ratio = btcb_value_usd / total_value_usd if total_value_usd > 0 else 0.0
 
-    # === Equivalents & ratios (exactly like SOL/ORCA) ===
+    # === CLEARER PRICE RATIOS (intuitive names) ===
+    pepe_per_btcb = prices["btcb"] / prices["pepe"] if prices["pepe"] > 0 else 0.0   # huge number
+    btcb_per_pepe = prices["pepe"] / prices["btcb"] if prices["btcb"] > 0 else 0.0    # tiny number
+
+    # === Equivalents & ratios ===
     btcb_equivalent = btcb_balance + (pepe_value_usd / prices["btcb"]) if prices["btcb"] > 0 else btcb_balance
     pepe_equivalent = pepe_balance + (btcb_value_usd / prices["pepe"]) if prices["pepe"] > 0 else pepe_balance
-    btcb_per_pepe = prices["btcb"] / prices["pepe"] if prices["pepe"] > 0 else 0.0
-    pepe_per_btcb = prices["pepe"] / prices["btcb"] if prices["btcb"] > 0 else 0.0
     portfolio_pepe_ratio = 1.0 - portfolio_btcb_ratio
 
     print("\n📊 Current Balances:")
@@ -158,14 +160,14 @@ def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
     print(f"   PEPE equivalent : {pepe_equivalent:,.0f} PEPE")
 
     print("\n📈 Price Ratios:")
-    print(f"   1 BTCB = {btcb_per_pepe:,.0f} PEPE")
-    print(f"   1 PEPE = {pepe_per_btcb:.14e} BTCB")   # ← scientific notation for tiny number
+    print(f"   1 BTCB = {pepe_per_btcb:,.0f} PEPE")
+    print(f"   1 PEPE = {btcb_per_pepe:.14e} BTCB")
 
     print("\n💰 Current Prices:")
     print(f"   BTCB ≈ ${prices['btcb']:,.2f}")
     print(f"   PEPE  = ${prices['pepe']:,.8f}")
 
-    # CSV — now with correct precision for pepe_per_btcb
+    # CSV — now with clearer column names
     if first_run:
         row = {
             "timestamp_kst": now_kst.isoformat(),
@@ -180,8 +182,8 @@ def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
             "total_value_usd": round(total_value_usd, 2),
             "btcb_equivalent": round(btcb_equivalent, 9),
             "pepe_equivalent": round(pepe_equivalent, 2),
-            "btcb_per_pepe": round(btcb_per_pepe, 2),
-            "pepe_per_btcb": round(pepe_per_btcb, 15),      # ← 15 decimals = no more 0.0
+            "pepe_per_btcb": round(pepe_per_btcb, 2),      # huge number
+            "btcb_per_pepe": round(btcb_per_pepe, 15),     # tiny number
             "portfolio_btcb_ratio": round(portfolio_btcb_ratio, 6),
             "portfolio_pepe_ratio": round(portfolio_pepe_ratio, 6),
         }
