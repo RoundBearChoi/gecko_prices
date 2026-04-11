@@ -35,10 +35,6 @@ CONFIG = {
 }
 # ================================================================
 
-def get_bnb_balance(w3: Web3, address: str) -> float:
-    balance_wei = w3.eth.get_balance(address)
-    return balance_wei / 1_000_000_000_000_000_000
-
 def get_token_balance(w3: Web3, address: str, token_contract: str) -> float:
     ERC20_ABI = [
         {"constant": True, "inputs": [{"name": "_owner", "type": "address"}], "name": "balanceOf", "outputs": [{"name": "balance", "type": "uint256"}], "type": "function"},
@@ -50,7 +46,8 @@ def get_token_balance(w3: Web3, address: str, token_contract: str) -> float:
     return raw_balance / (10 ** decimals)
 
 def get_prices() -> Dict[str, float]:
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={CONFIG['COINGECKO_IDS']}&vs_currencies={CONFIG['VS_CURRENCY']}"
+    # ✅ ADDED &precision=full → gives maximum decimal precision for tiny prices like PEPE
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={CONFIG['COINGECKO_IDS']}&vs_currencies={CONFIG['VS_CURRENCY']}&precision=full"
     response = requests.get(url, timeout=15)
     response.raise_for_status()
     data: Dict[str, Any] = response.json()
@@ -121,7 +118,6 @@ def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
     print(f"Updated : {timestamp_str} (KST)")
     print("=" * 90)
 
-    bnb_balance = get_bnb_balance(w3, address)
     btcb_balance = get_token_balance(w3, address, CONFIG["BTCB_CONTRACT"])
     pepe_balance = get_token_balance(w3, address, CONFIG["PEPE_CONTRACT"])
     prices = get_prices()
@@ -142,7 +138,6 @@ def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
     portfolio_pepe_ratio = 1.0 - portfolio_btcb_ratio
 
     print("\n📊 Current Balances:")
-    print(f"   BNB   : {bnb_balance:,.6f} BNB")
     print(f"   BTCB  : {btcb_balance:,.6f} BTCB  (${btcb_value_usd:,.2f})")
     print(f"   PEPE  : {pepe_balance:,.0f} PEPE (${pepe_value_usd:,.2f})")
     print(f"   TOTAL (BTCB+PEPE): ${total_value_usd:,.2f}")
@@ -165,25 +160,24 @@ def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
 
     print("\n💰 Current Prices:")
     print(f"   BTCB ≈ ${prices['btcb']:,.2f}")
-    print(f"   PEPE  = ${prices['pepe']:,.8f}")
+    print(f"   PEPE  = ${prices['pepe']:,.18f}")   # ← now uses full precision from CoinGecko
 
-    # CSV — now with clearer column names
+    # CSV — updated to store full PEPE precision
     if first_run:
         row = {
             "timestamp_kst": now_kst.isoformat(),
             "readable_time_kst": timestamp_str,
-            "bnb_balance": round(bnb_balance, 9),
             "btcb_balance": round(btcb_balance, 9),
             "pepe_balance": round(pepe_balance, 2),
             "btcb_price_usd": round(prices["btcb"], 6),
-            "pepe_price_usd": round(prices["pepe"], 8),
+            "pepe_price_usd": round(prices["pepe"], 18),   # ← CHANGED: now full 18 decimals
             "btcb_value_usd": round(btcb_value_usd, 2),
             "pepe_value_usd": round(pepe_value_usd, 2),
             "total_value_usd": round(total_value_usd, 2),
             "btcb_equivalent": round(btcb_equivalent, 9),
             "pepe_equivalent": round(pepe_equivalent, 2),
-            "pepe_per_btcb": round(pepe_per_btcb, 2),      # huge number
-            "btcb_per_pepe": round(btcb_per_pepe, 15),     # tiny number
+            "pepe_per_btcb": round(pepe_per_btcb, 2),
+            "btcb_per_pepe": round(btcb_per_pepe, 15),
             "portfolio_btcb_ratio": round(portfolio_btcb_ratio, 6),
             "portfolio_pepe_ratio": round(portfolio_pepe_ratio, 6),
         }
