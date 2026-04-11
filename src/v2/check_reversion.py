@@ -12,7 +12,7 @@ config = {
     'n_months': 8,
     'window_days': 30,                    # rolling window for mean/SD
     'n_boots': 5000,
-    'block_size_hours': 24*7,             # 7 days – preserves temporal structure
+    'block_size_hours': 24*4,             # 7 days – preserves temporal structure
     'sd_threshold': 1.0,                  # +-1 SD
     'reversion_hysteresis': 0.5,          # return inside |z| < 0.5 to confirm clean trip
     'min_obs_per_window': 1000,           # skip windows/pairs with too few data
