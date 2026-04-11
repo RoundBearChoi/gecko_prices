@@ -1,0 +1,13 @@
+bitcoin
+ethereum
+binancecoin
+solana
+dogecoin
+monero
+litecoin
+zcash
+pepe
+ethereum-classic
+bonk
+fartcoin
+pump-fun
