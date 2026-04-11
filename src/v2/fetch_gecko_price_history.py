@@ -3,6 +3,9 @@
 fetch_gecko_price_history_refactored.py
 Refactored + Linux-only * masking (identical to fetch_top_tokens.py)
 NOW WITH HIGH-PRECISION SAVING FOR MICRO-CAP / MEME TOKENS
+
+UPDATED: Always fetches the FULL list from subjective_tokens_ranked.csv
+         No command-line arguments, no default BTC
 """
 
 import sys
@@ -21,10 +24,9 @@ CONFIG = {
     "force_fresh_download": True,      # ← Change to False to reuse existing files
     "vs_currency": "usd",
     "chunk_days": 90,                   # Safe max for hourly data
-    "top_tokens_file": "top_tokens_by_market_cap.csv",
+    "top_tokens_file": "subjective_tokens_ranked.csv",
     "sleep_between_calls": 1.2,
-    "default_token": "bitcoin",
-    "default_months": 1,
+    "default_months": 1,                # Change this if you want more/less history by default
 }
 # =======================================================
 
@@ -152,7 +154,6 @@ def fetch_price_history_for_token(token_input: str, months: int, api_key: str) -
     df["datetime"] = pd.to_datetime(df["datetime"])
 
     # ==================== NEW: HIGH-PRECISION SAVE (Option B) ====================
-    # This fixes the BABYDOGE / micro-cap zero problem once and for all
     print(f"   Saving with full double-precision (%.18e) — tiny prices preserved")
     if (df["price_usd"] < 1e-8).any():
         print(f"   ⚠️  Detected ultra-low prices (< 1e-8) — using scientific notation")
@@ -169,7 +170,6 @@ def fetch_price_history_for_token(token_input: str, months: int, api_key: str) -
     return df
 
 
-# (The rest of the file — fetch_price_history_for_tokens, get_api_key, main — is unchanged)
 def fetch_price_history_for_tokens(token_list: list[str], months: int, api_key: str) -> dict[str, pd.DataFrame]:
     """Function #3: Batch of tokens → hourly price history for each."""
     results = {}
@@ -193,7 +193,7 @@ def fetch_price_history_for_tokens(token_list: list[str], months: int, api_key: 
 
 def get_api_key() -> str:
     """Function #1: Gets API key (RAM only) using Linux-only * masking."""
-    print("\n=== CoinGecko Hourly Price History Fetcher ===")
+    print("\n=== CoinGecko Hourly Price History Fetcher (FULL LIST MODE) ===")
     api_key = get_masked_input("Enter your CoinGecko Pro API key: ")
     if not api_key:
         print("Error: API key cannot be empty.")
@@ -202,32 +202,22 @@ def get_api_key() -> str:
 
 
 def main():
-    """CLI entry point — now supports single token OR list of tokens + optional months."""
-    if len(sys.argv) == 1:
-        token_list = [CONFIG["default_token"].lower().strip()]
-        months = CONFIG["default_months"]
-        print(f"ℹ️  No arguments provided → Using CONFIG defaults: {token_list[0].upper()} for {months} month(s)")
-    else:
-        if sys.argv[-1].isdigit():
-            months = int(sys.argv[-1])
-            token_list = [arg.strip().lower() for arg in sys.argv[1:-1]]
-        else:
-            months = CONFIG["default_months"]
-            token_list = [arg.strip().lower() for arg in sys.argv[1:]]
+    """Simplified entry point — ALWAYS fetches the FULL list from subjective_tokens_ranked.csv"""
+    print("🚀 Starting full bulk fetch from subjective_tokens_ranked.csv...")
 
-        if not token_list:
-            token_list = [CONFIG["default_token"].lower().strip()]
-            print(f"⚠️  Only months provided → using default token '{token_list[0].upper()}' for {months} month(s)")
+    # Load the complete token list
+    print(f"📋 Loading full token list from {CONFIG['top_tokens_file']}...")
+    tokens_df = load_token_mapping()
+    token_list = tokens_df['symbol'].str.lower().tolist()
+    months = CONFIG["default_months"]
 
-    print(f"\n🚀 Fetching ≈{months} months of hourly USD prices for {len(token_list)} token(s):")
-    print("   " + ", ".join(t.upper() for t in token_list))
+    print(f"   Found {len(token_list):,} tokens (first 5: {token_list[:5]})")
+    print(f"   Fetching ≈{months} month(s) of hourly USD prices for ALL tokens")
 
     api_key = get_api_key()
 
-    if len(token_list) == 1:
-        fetch_price_history_for_token(token_list[0], months, api_key)
-    else:
-        fetch_price_history_for_tokens(token_list, months, api_key)
+    # Run the bulk fetcher
+    fetch_price_history_for_tokens(token_list, months, api_key)
 
 
 if __name__ == "__main__":
