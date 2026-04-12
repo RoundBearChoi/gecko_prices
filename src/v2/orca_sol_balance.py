@@ -31,17 +31,58 @@ CONFIG = {
     # ==================== LIVE MONITOR SETTINGS ====================
     "REFRESH_INTERVAL": 60*5,
     "UPDATE_ONCE": False,            # True = one-time run, False = live with countdown
+    
+    # ==================== RATE LIMIT SETTINGS ====================
+    "RATE_LIMIT_WAIT_SECONDS": 180,  # 3 minutes FIXED wait on rate limit (no backoff)
 }
 # ================================================================
 
+def _handle_rate_limit(error_msg: str = "") -> bool:
+    """Return True if the error looks like a rate limit (used by all three API functions)."""
+    if not error_msg:
+        return False
+    msg_lower = error_msg.lower()
+    return any(term in msg_lower for term in ["rate limit", "too many requests", "429", "rate exceeded"])
+
+
 def get_sol_balance(rpc_url: str, pubkey: str) -> float:
     payload = {"jsonrpc": "2.0", "id": 1, "method": "getBalance", "params": [pubkey]}
-    response = requests.post(rpc_url, json=payload, timeout=20)
-    response.raise_for_status()
-    data: Dict[str, Any] = response.json()
-    if "error" in data:
-        raise Exception(f"RPC Error: {data['error']}")
-    return data["result"]["value"] / 1_000_000_000.0
+    wait_time = CONFIG["RATE_LIMIT_WAIT_SECONDS"]
+    max_attempts = 5
+
+    for attempt in range(max_attempts):
+        try:
+            response = requests.post(rpc_url, json=payload, timeout=20)
+            response.raise_for_status()
+            data: Dict[str, Any] = response.json()
+            
+            if "error" in data:
+                error = data["error"]
+                if _handle_rate_limit(str(error)):
+                    if attempt < max_attempts - 1:
+                        print(f"⚠️  Solana RPC rate limit detected. Waiting {wait_time} seconds before retry ({attempt+1}/{max_attempts})...")
+                        time.sleep(wait_time)
+                        continue
+                raise Exception(f"RPC Error: {error}")
+            
+            return data["result"]["value"] / 1_000_000_000.0
+            
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 429:
+                if attempt < max_attempts - 1:
+                    print(f"⚠️  HTTP 429 Rate Limit (Solana RPC). Waiting {wait_time} seconds...")
+                    time.sleep(wait_time)
+                    continue
+            raise
+        except Exception as e:
+            # Only retry on rate-limit-like errors; everything else fails immediately
+            if attempt < max_attempts - 1 and _handle_rate_limit(str(e)):
+                print(f"⚠️  Rate limit (unexpected) detected. Waiting {wait_time} seconds...")
+                time.sleep(wait_time)
+                continue
+            raise
+    
+    raise Exception("Failed to get SOL balance after maximum rate-limit retries")
 
 
 def get_orca_balance(rpc_url: str, pubkey: str, orca_mint: str) -> float:
@@ -49,29 +90,77 @@ def get_orca_balance(rpc_url: str, pubkey: str, orca_mint: str) -> float:
         "jsonrpc": "2.0", "id": 1, "method": "getTokenAccountsByOwner",
         "params": [pubkey, {"mint": orca_mint}, {"encoding": "jsonParsed"}]
     }
-    response = requests.post(rpc_url, json=payload, timeout=20)
-    response.raise_for_status()
-    data: Dict[str, Any] = response.json()
-    if "error" in data:
-        raise Exception(f"RPC Error: {data['error']}")
+    wait_time = CONFIG["RATE_LIMIT_WAIT_SECONDS"]
+    max_attempts = 5
+
+    for attempt in range(max_attempts):
+        try:
+            response = requests.post(rpc_url, json=payload, timeout=20)
+            response.raise_for_status()
+            data: Dict[str, Any] = response.json()
+            
+            if "error" in data:
+                error = data["error"]
+                if _handle_rate_limit(str(error)):
+                    if attempt < max_attempts - 1:
+                        print(f"⚠️  Solana RPC rate limit detected (ORCA balance). Waiting {wait_time} seconds...")
+                        time.sleep(wait_time)
+                        continue
+                raise Exception(f"RPC Error: {error}")
+            
+            accounts = data.get("result", {}).get("value", [])
+            if not accounts:
+                return 0.0
+            
+            token_info = accounts[0]["account"]["data"]["parsed"]["info"]["tokenAmount"]
+            return int(token_info["amount"]) / (10 ** int(token_info["decimals"]))
+            
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 429:
+                if attempt < max_attempts - 1:
+                    print(f"⚠️  HTTP 429 Rate Limit (Solana RPC - ORCA). Waiting {wait_time} seconds...")
+                    time.sleep(wait_time)
+                    continue
+            raise
+        except Exception as e:
+            if attempt < max_attempts - 1 and _handle_rate_limit(str(e)):
+                print(f"⚠️  Rate limit (unexpected) detected. Waiting {wait_time} seconds...")
+                time.sleep(wait_time)
+                continue
+            raise
     
-    accounts = data.get("result", {}).get("value", [])
-    if not accounts:
-        return 0.0
-    
-    token_info = accounts[0]["account"]["data"]["parsed"]["info"]["tokenAmount"]
-    return int(token_info["amount"]) / (10 ** int(token_info["decimals"]))
+    raise Exception("Failed to get ORCA balance after maximum rate-limit retries")
 
 
 def get_prices() -> Dict[str, float]:
     url = f"https://api.coingecko.com/api/v3/simple/price?ids={CONFIG['COINGECKO_IDS']}&vs_currencies={CONFIG['VS_CURRENCY']}"
-    response = requests.get(url, timeout=15)
-    response.raise_for_status()
-    data: Dict[str, Any] = response.json()
-    return {
-        "sol": data.get("solana", {}).get(CONFIG["VS_CURRENCY"], 0.0),
-        "orca": data.get("orca", {}).get(CONFIG["VS_CURRENCY"], 0.0),
-    }
+    wait_time = CONFIG["RATE_LIMIT_WAIT_SECONDS"]
+    max_attempts = 5
+
+    for attempt in range(max_attempts):
+        try:
+            response = requests.get(url, timeout=15)
+            response.raise_for_status()
+            data: Dict[str, Any] = response.json()
+            return {
+                "sol": data.get("solana", {}).get(CONFIG["VS_CURRENCY"], 0.0),
+                "orca": data.get("orca", {}).get(CONFIG["VS_CURRENCY"], 0.0),
+            }
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 429:
+                if attempt < max_attempts - 1:
+                    print(f"⚠️  CoinGecko rate limit (429). Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                    continue
+            raise
+        except Exception as e:
+            if attempt < max_attempts - 1 and _handle_rate_limit(str(e)):
+                print(f"⚠️  CoinGecko rate limit detected. Waiting {wait_time} seconds...")
+                time.sleep(wait_time)
+                continue
+            raise
+    
+    raise Exception("Failed to fetch prices after maximum rate-limit retries")
 
 
 def clear_screen():
