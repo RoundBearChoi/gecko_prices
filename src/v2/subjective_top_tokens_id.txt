@@ -11,3 +11,4 @@ ethereum-classic
 bonk
 fartcoin
 pump-fun
+near
