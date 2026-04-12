@@ -5,6 +5,7 @@ from datetime import datetime
 import zoneinfo
 import time
 import sys
+import select  # ← for non-blocking 'r' key check
 from typing import Dict, Any
 
 # ========================= CONFIG SECTION =========================
@@ -126,8 +127,9 @@ def print_portfolio_bar(orca_ratio: float, sol_balance: float, orca_balance: flo
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
 
 
-def fetch_and_display(address: str, first_run: bool = False):
-    """Shared function to fetch data and print everything."""
+def fetch_and_display(address: str, save_to_csv: bool = False):
+    """Shared function to fetch data and print everything.
+    CSV is written only when save_to_csv=True (first run + every manual refresh)."""
     kst_tz = zoneinfo.ZoneInfo(CONFIG["KST_TIMEZONE"])
     now_kst = datetime.now(kst_tz)
     timestamp_str = now_kst.strftime("%Y-%m-%d %H:%M:%S %Z")
@@ -149,9 +151,8 @@ def fetch_and_display(address: str, first_run: bool = False):
     sol_equivalent = sol_balance + (orca_value_usd / prices["sol"]) if prices["sol"] > 0 else sol_balance
     orca_equivalent = orca_balance + (sol_value_usd / prices["orca"]) if prices["orca"] > 0 else orca_balance
 
-    # === CLEARER PRICE RATIOS (intuitive names) ===
-    orca_per_sol = prices["sol"] / prices["orca"] if prices["orca"] > 0 else 0.0   # large number
-    sol_per_orca = prices["orca"] / prices["sol"] if prices["sol"] > 0 else 0.0    # tiny number
+    orca_per_sol = prices["sol"] / prices["orca"] if prices["orca"] > 0 else 0.0
+    sol_per_orca = prices["orca"] / prices["sol"] if prices["sol"] > 0 else 0.0
 
     portfolio_orca_ratio = orca_value_usd / total_value_usd if total_value_usd > 0 else 0.0
 
@@ -180,8 +181,8 @@ def fetch_and_display(address: str, first_run: bool = False):
     print(f"   SOL  = ${prices['sol']:,.2f}")
     print(f"   ORCA = ${prices['orca']:,.4f}")
 
-    # CSV — always written exactly once (with clearer column names)
-    if first_run:
+    # CSV logic — now controlled by save_to_csv flag
+    if save_to_csv:
         row = {
             "timestamp_kst": now_kst.isoformat(),
             "readable_time_kst": timestamp_str,
@@ -194,8 +195,8 @@ def fetch_and_display(address: str, first_run: bool = False):
             "total_value_usd": round(total_value_usd, 2),
             "sol_equivalent": round(sol_equivalent, 9),
             "orca_equivalent": round(orca_equivalent, 9),
-            "orca_per_sol": round(orca_per_sol, 6),      # large number
-            "sol_per_orca": round(sol_per_orca, 8),      # tiny number
+            "orca_per_sol": round(orca_per_sol, 6),
+            "sol_per_orca": round(sol_per_orca, 8),
             "portfolio_orca_ratio": round(portfolio_orca_ratio, 6),
             "portfolio_sol_ratio": round(1 - portfolio_orca_ratio, 6),
         }
@@ -207,23 +208,33 @@ def fetch_and_display(address: str, first_run: bool = False):
                 writer.writeheader()
                 print(f"📄 Created new CSV file: {CONFIG['CSV_FILENAME']}")
             else:
-                print(f"📄 Appended initial data to: {CONFIG['CSV_FILENAME']}")
+                print(f"📄 Appended manual refresh data to: {CONFIG['CSV_FILENAME']}")
             writer.writerow(row)
         print("   ✅ Portfolio snapshot saved to CSV")
     else:
-        print("📄 CSV already recorded (skipped)")
+        print("📄 CSV skipped (automatic refresh)")
 
     return now_kst
 
 
-def countdown(refresh_interval: int):
-    """Live countdown that updates every second on the same line."""
+def countdown(refresh_interval: int) -> bool:
+    """Live countdown with manual 'r' + Enter refresh trigger.
+    Returns True if manual refresh was triggered, False if timer finished normally."""
     for remaining in range(refresh_interval, 0, -1):
-        print(f"⏳ Next refresh in {remaining:2d} seconds... (Ctrl+C to stop)", end="\r")
+        msg = f"⏳ Next refresh in {remaining:2d}s... (press r then Enter to refresh now, Ctrl+C to stop)"
+        print(msg, end="\r")
         sys.stdout.flush()
-        time.sleep(1)
-    # Clear the countdown line when finished
-    print(" " * 80, end="\r")
+        
+        # Non-blocking keyboard check every second
+        if select.select([sys.stdin], [], [], 1.0)[0]:
+            line = sys.stdin.readline().strip().lower()
+            if line in ("r", "refresh"):
+                print("\n🔄 Manual refresh triggered!")
+                return True  # signal main loop to save next snapshot
+        
+    # Timer finished normally → no manual trigger
+    print(" " * 100, end="\r")
+    return False
 
 
 def main() -> None:
@@ -237,23 +248,27 @@ def main() -> None:
     if CONFIG["UPDATE_ONCE"]:
         print("🔄 One-time mode enabled (UPDATE_ONCE=True)")
         print("=" * 90)
-        fetch_and_display(address, first_run=True)
+        fetch_and_display(address, save_to_csv=True)
         print("\n✅ One-time check complete. Exiting.")
     else:
-        print(f"🔄 Live mode enabled — refreshing every {CONFIG['REFRESH_INTERVAL']} seconds with countdown")
-        print("   CSV will be recorded only once (first refresh)")
-        print("   Press Ctrl+C to stop\n")
+        print(f"🔄 Live mode enabled — refreshing every {CONFIG['REFRESH_INTERVAL']} seconds")
+        print("   Press 'r' then Enter anytime during countdown to force refresh + save to CSV")
+        print("   Ctrl+C to stop\n")
         print("=" * 90)
 
-        first_run = True
+        save_to_csv_next = True  # first run always saves
         try:
             while True:
-                clear_screen()                    # ← clear only happens in live mode
-                fetch_and_display(address, first_run=first_run)
-                first_run = False
-
-                # Live countdown (updates in place)
-                countdown(CONFIG["REFRESH_INTERVAL"])
+                clear_screen()
+                fetch_and_display(address, save_to_csv=save_to_csv_next)
+                
+                # Reset flag (next refresh will skip CSV unless manual trigger)
+                save_to_csv_next = False
+                
+                # Run countdown and check if user triggered manual refresh
+                manual_triggered = countdown(CONFIG["REFRESH_INTERVAL"])
+                if manual_triggered:
+                    save_to_csv_next = True  # next immediate refresh will save to CSV
 
         except KeyboardInterrupt:
             clear_screen()
