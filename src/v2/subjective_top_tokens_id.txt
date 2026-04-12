@@ -6,9 +6,9 @@ dogecoin
 monero
 litecoin
 zcash
+near
 pepe
 ethereum-classic
+jupiter-exchange-solana
 bonk
-fartcoin
-pump-fun
-near
+pancakeswap-token
