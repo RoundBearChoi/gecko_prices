@@ -33,35 +33,87 @@ CONFIG = {
     # ==================== LIVE MONITOR SETTINGS ====================
     "REFRESH_INTERVAL": 60*5,
     "UPDATE_ONCE": False,
+    
+    # ==================== RATE LIMIT SETTINGS ====================
+    "RATE_LIMIT_WAIT_SECONDS": 180,  # 3 minutes FIXED wait on rate limit (no backoff)
 }
 # ================================================================
+
+def _handle_rate_limit(error_msg: str = "") -> bool:
+    """Return True if the error looks like a rate limit (used by both BSC and CoinGecko)."""
+    if not error_msg:
+        return False
+    msg_lower = error_msg.lower()
+    return any(term in msg_lower for term in ["rate limit", "too many requests", "429", "rate exceeded"])
+
 
 def get_token_balance(w3: Web3, address: str, token_contract: str) -> float:
     ERC20_ABI = [
         {"constant": True, "inputs": [{"name": "_owner", "type": "address"}], "name": "balanceOf", "outputs": [{"name": "balance", "type": "uint256"}], "type": "function"},
         {"constant": True, "inputs": [], "name": "decimals", "outputs": [{"name": "", "type": "uint8"}], "type": "function"},
     ]
-    contract = w3.eth.contract(address=token_contract, abi=ERC20_ABI)
-    raw_balance = contract.functions.balanceOf(address).call()
-    decimals = contract.functions.decimals().call()
-    return raw_balance / (10 ** decimals)
+    wait_time = CONFIG["RATE_LIMIT_WAIT_SECONDS"]
+    max_attempts = 5
+
+    for attempt in range(max_attempts):
+        try:
+            contract = w3.eth.contract(address=token_contract, abi=ERC20_ABI)
+            raw_balance = contract.functions.balanceOf(address).call()
+            decimals = contract.functions.decimals().call()
+            return raw_balance / (10 ** decimals)
+        except Exception as e:
+            error_str = str(e)
+            # Catch HTTP 429, RPC rate-limit messages, etc.
+            if (isinstance(e, requests.exceptions.HTTPError) and e.response is not None and e.response.status_code == 429) or \
+               _handle_rate_limit(error_str):
+                if attempt < max_attempts - 1:
+                    print(f"⚠️  BSC RPC rate limit detected (token balance). Waiting {wait_time} seconds... ({attempt+1}/{max_attempts})")
+                    time.sleep(wait_time)
+                    continue
+            raise  # non-rate-limit error or max attempts reached
+    
+    raise Exception("Failed to get token balance after maximum rate-limit retries")
+
 
 def get_prices() -> Dict[str, float]:
-    # ✅ ADDED &precision=full → gives maximum decimal precision for tiny prices like PEPE
+    # ✅ precision=full kept for tiny PEPE prices
     url = f"https://api.coingecko.com/api/v3/simple/price?ids={CONFIG['COINGECKO_IDS']}&vs_currencies={CONFIG['VS_CURRENCY']}&precision=full"
-    response = requests.get(url, timeout=15)
-    response.raise_for_status()
-    data: Dict[str, Any] = response.json()
-    return {
-        "btcb": data.get("binance-bitcoin", {}).get(CONFIG["VS_CURRENCY"], 0.0),
-        "pepe": data.get("pepe", {}).get(CONFIG["VS_CURRENCY"], 0.0),
-    }
+    wait_time = CONFIG["RATE_LIMIT_WAIT_SECONDS"]
+    max_attempts = 5
+
+    for attempt in range(max_attempts):
+        try:
+            response = requests.get(url, timeout=15)
+            response.raise_for_status()
+            data: Dict[str, Any] = response.json()
+            return {
+                "btcb": data.get("binance-bitcoin", {}).get(CONFIG["VS_CURRENCY"], 0.0),
+                "pepe": data.get("pepe", {}).get(CONFIG["VS_CURRENCY"], 0.0),
+            }
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 429:
+                if attempt < max_attempts - 1:
+                    print(f"⚠️  CoinGecko rate limit (429). Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                    continue
+            raise
+        except Exception as e:
+            if attempt < max_attempts - 1 and _handle_rate_limit(str(e)):
+                print(f"⚠️  CoinGecko rate limit detected. Waiting {wait_time} seconds...")
+                time.sleep(wait_time)
+                continue
+            raise
+    
+    raise Exception("Failed to fetch prices after maximum rate-limit retries")
+
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
+
 def print_portfolio_bar(btcb_ratio: float, btcb_balance: float, pepe_balance: float, 
                        btcb_price: float, pepe_price: float):
+    """(Unchanged from your original)"""
     pepe_ratio = 1.0 - btcb_ratio
     width = CONFIG["BAR_WIDTH"]
     
@@ -163,7 +215,7 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
 
     print("\n💰 Current Prices:")
     print(f"   BTCB ≈ ${prices['btcb']:,.2f}")
-    print(f"   PEPE  = ${prices['pepe']:,.18f}")   # ← now uses full precision from CoinGecko
+    print(f"   PEPE  = ${prices['pepe']:,.18f}")   # ← full precision from CoinGecko
 
     # CSV — only when save_to_csv=True (first run + manual refresh)
     if save_to_csv:
