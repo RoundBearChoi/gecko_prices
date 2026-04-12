@@ -5,6 +5,7 @@ from datetime import datetime
 import zoneinfo
 import time
 import sys
+import select  # ← for non-blocking 'r' key check
 from typing import Dict, Any
 from web3 import Web3
 
@@ -107,7 +108,9 @@ def print_portfolio_bar(btcb_ratio: float, btcb_balance: float, pepe_balance: fl
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
 
 
-def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
+def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
+    """Shared function to fetch data and print everything.
+    CSV is written only when save_to_csv=True (first run + manual refresh)."""
     kst_tz = zoneinfo.ZoneInfo(CONFIG["KST_TIMEZONE"])
     now_kst = datetime.now(kst_tz)
     timestamp_str = now_kst.strftime("%Y-%m-%d %H:%M:%S %Z")
@@ -162,15 +165,15 @@ def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
     print(f"   BTCB ≈ ${prices['btcb']:,.2f}")
     print(f"   PEPE  = ${prices['pepe']:,.18f}")   # ← now uses full precision from CoinGecko
 
-    # CSV — updated to store full PEPE precision
-    if first_run:
+    # CSV — only when save_to_csv=True (first run + manual refresh)
+    if save_to_csv:
         row = {
             "timestamp_kst": now_kst.isoformat(),
             "readable_time_kst": timestamp_str,
             "btcb_balance": round(btcb_balance, 9),
             "pepe_balance": round(pepe_balance, 2),
             "btcb_price_usd": round(prices["btcb"], 6),
-            "pepe_price_usd": round(prices["pepe"], 18),   # ← CHANGED: now full 18 decimals
+            "pepe_price_usd": round(prices["pepe"], 18),
             "btcb_value_usd": round(btcb_value_usd, 2),
             "pepe_value_usd": round(pepe_value_usd, 2),
             "total_value_usd": round(total_value_usd, 2),
@@ -189,21 +192,33 @@ def fetch_and_display(address: str, w3: Web3, first_run: bool = False):
                 writer.writeheader()
                 print(f"📄 Created new CSV file: {CONFIG['CSV_FILENAME']}")
             else:
-                print(f"📄 Appended data to: {CONFIG['CSV_FILENAME']}")
+                print(f"📄 Appended manual refresh data to: {CONFIG['CSV_FILENAME']}")
             writer.writerow(row)
         print("   ✅ Portfolio snapshot saved to CSV")
     else:
-        print("📄 CSV already recorded (skipped)")
+        print("📄 CSV skipped (automatic refresh)")
 
     return now_kst
 
 
-def countdown(refresh_interval: int):
+def countdown(refresh_interval: int) -> bool:
+    """Live countdown with manual 'r' + Enter refresh trigger.
+    Returns True if manual refresh was triggered, False if timer finished normally."""
     for remaining in range(refresh_interval, 0, -1):
-        print(f"⏳ Next refresh in {remaining:2d} seconds... (Ctrl+C to stop)", end="\r")
+        msg = f"⏳ Next refresh in {remaining:2d}s... (press r then Enter to refresh now, Ctrl+C to stop)"
+        print(msg, end="\r")
         sys.stdout.flush()
-        time.sleep(1)
-    print(" " * 90, end="\r")
+        
+        # Non-blocking keyboard check every second
+        if select.select([sys.stdin], [], [], 1.0)[0]:
+            line = sys.stdin.readline().strip().lower()
+            if line in ("r", "refresh"):
+                print("\n🔄 Manual refresh triggered!")
+                return True  # signal main loop to save next snapshot
+        
+    # Timer finished normally → no manual trigger
+    print(" " * 100, end="\r")
+    return False
 
 
 def main() -> None:
@@ -229,17 +244,26 @@ def main() -> None:
 
     if CONFIG["UPDATE_ONCE"]:
         print("🔄 One-time mode enabled")
-        fetch_and_display(address, w3, first_run=True)
+        fetch_and_display(address, w3, save_to_csv=True)
     else:
         print(f"🔄 Live mode enabled — refreshing every {CONFIG['REFRESH_INTERVAL']} seconds")
-        print("   Press Ctrl+C to stop\n")
-        first_run = True
+        print("   Press 'r' then Enter anytime during countdown to force refresh + save to CSV")
+        print("   Ctrl+C to stop\n")
+        
+        save_to_csv_next = True  # first run always saves
         try:
             while True:
                 clear_screen()
-                fetch_and_display(address, w3, first_run=first_run)
-                first_run = False
-                countdown(CONFIG["REFRESH_INTERVAL"])
+                fetch_and_display(address, w3, save_to_csv=save_to_csv_next)
+                
+                # Reset flag (next refresh will skip CSV unless manual trigger)
+                save_to_csv_next = False
+                
+                # Run countdown and check if user triggered manual refresh
+                manual_triggered = countdown(CONFIG["REFRESH_INTERVAL"])
+                if manual_triggered:
+                    save_to_csv_next = True  # next immediate refresh will save to CSV
+
         except KeyboardInterrupt:
             clear_screen()
             print("\n👋 Live monitoring stopped by user.")
