@@ -13,3 +13,5 @@ jupiter-exchange-solana
 bonk
 pancakeswap-token
 pudgy-penguins
+gigachad-2
+raydium
