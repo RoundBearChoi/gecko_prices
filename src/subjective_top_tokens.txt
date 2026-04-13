@@ -25,5 +25,3 @@ mx
 1inch
 babydoge
 orca
-api3
-red
