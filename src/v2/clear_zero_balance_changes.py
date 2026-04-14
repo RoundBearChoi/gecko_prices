@@ -5,14 +5,24 @@ from pathlib import Path
 import numpy as np
 
 # ================================================
+# CONFIGURATION
+# ================================================
+override_file = True
+# Set override_file = True to OVERWRITE the original *_balances*.csv files
+# instead of creating new files with "_filtered" in the name.
+#
+# ⚠️  WARNING: When True, your original files will be permanently replaced.
+#    Make sure you have backups before enabling this option!
+
+# ================================================
 # MAIN SCRIPT: Process all *_balances.csv files
 # ================================================
 # What this does:
 # 1. Automatically discovers every CSV file whose name contains "_balances"
-# 2. For each file, identifies every column that tracks balance *changes* (e.g. btcb_balance_change, pepe_balance_change, sol_balance_change, etc.)
-# 3. Removes every row where **all** balance-change columns are zero (or extremely close to zero)
-# 4. Keeps only the rows that represent actual portfolio movements (trades, swaps, deposits, withdrawals, etc.)
-# 5. Saves a new filtered CSV with "_filtered" added to the original filename
+# 2. For each file, identifies every column that tracks balance *changes*
+# 3. Removes every row where ALL balance-change columns are zero (or extremely close to zero)
+# 4. Keeps only the rows that represent actual portfolio movements
+# 5. Saves either a new filtered CSV OR overwrites the original (based on config above)
 # 6. Prints a clear summary so you can see exactly what changed
 
 print("🔍 Searching for all CSV files containing '_balances' in the filename...\n")
@@ -28,6 +38,7 @@ else:
     print(f"✅ Found {len(balance_files)} balance file(s):")
     for f in balance_files:
         print(f"   • {f}")
+    print(f"⚙️  Configuration → override_file = {override_file}")
     print("\n" + "="*80 + "\n")
 
 for file_path in balance_files:
@@ -39,8 +50,6 @@ for file_path in balance_files:
     
     # ------------------------------------------------------------------
     # Step 1: Automatically detect ALL balance-change columns
-    #    We look for any column that ends with "_balance_change" or contains
-    #    "_balance_change" anywhere (covers both of your example files)
     # ------------------------------------------------------------------
     change_cols = [col for col in df.columns if "_balance_change" in col.lower()]
     
@@ -52,14 +61,10 @@ for file_path in balance_files:
     
     # ------------------------------------------------------------------
     # Step 2: Build a mask that is True ONLY when AT LEAST ONE change is non-zero
-    #    We use a tiny tolerance (1e-8) because floating-point numbers
-    #    can be something like -1.23e-16 instead of exactly 0.0
     # ------------------------------------------------------------------
-    # Start with all-False mask
     non_zero_mask = pd.Series(False, index=df.index)
     
     for col in change_cols:
-        # Absolute value comparison handles negative changes too
         non_zero_mask = non_zero_mask | (np.abs(df[col]) > 1e-8)
     
     # Apply the filter
@@ -74,14 +79,20 @@ for file_path in balance_files:
     print(f"   📊 Filtered rows : {filtered_row_count:>5}  (kept only actual balance changes)")
     print(f"   📊 Rows removed  : {rows_removed:>5}  (pure price-update rows)")
     
-    # Create output filename (e.g. btcb_pepe_balances_filtered.csv)
-    base_name = Path(file_path).stem
-    output_path = Path(file_path).with_name(f"{base_name}_filtered.csv")
+    # Determine output path based on config
+    if override_file:
+        output_path = Path(file_path)
+        print("   ⚠️  OVERRIDE ENABLED — will replace the original file!")
+        save_msg = f"💾 Overwrote original file → {output_path}"
+    else:
+        base_name = Path(file_path).stem
+        output_path = Path(file_path).with_name(f"{base_name}_filtered.csv")
+        save_msg = f"💾 Saved filtered data → {output_path}"
     
     filtered_df.to_csv(output_path, index=False)
-    print(f"   💾 Saved filtered data → {output_path}\n")
+    print(f"   {save_msg}\n")
     
-    # Optional: show the actual timestamps of the kept events (very useful for quick inspection)
+    # Optional: show the actual timestamps of the kept events
     if "readable_time_kst" in filtered_df.columns:
         print("   📅 Actual balance-change timestamps:")
         for ts in filtered_df["readable_time_kst"].tolist():
@@ -89,5 +100,8 @@ for file_path in balance_files:
         print()
 
 print("="*80)
-print("🎉 All done! Filtered versions have been created for every matching CSV.")
+if override_file:
+    print("🎉 All done! Original files have been overwritten with filtered data.")
+else:
+    print("🎉 All done! Filtered versions have been created for every matching CSV.")
 print("   You can now analyze only the moments when your portfolio actually moved.")
