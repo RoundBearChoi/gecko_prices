@@ -39,6 +39,59 @@ CONFIG = {
 }
 # ================================================================
 
+# ====================== HELPER FUNCTIONS ======================
+def get_previous_balances(csv_filename: str) -> tuple[float, float]:
+    """Return previous (btcb_balance, pepe_balance) from the last CSV row.
+    Returns (0.0, 0.0) on first run or if CSV is missing/empty."""
+    if not os.path.isfile(csv_filename):
+        return 0.0, 0.0
+    try:
+        with open(csv_filename, "r", newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+            if not rows:
+                return 0.0, 0.0
+            last_row = rows[-1]
+            return (
+                float(last_row.get("btcb_balance", 0)),
+                float(last_row.get("pepe_balance", 0))
+            )
+    except Exception as e:
+        print(f"⚠️  Could not read previous balances for delta calculation: {e}")
+        return 0.0, 0.0
+
+
+def get_baseline_equivalents(csv_filename: str) -> tuple[float, float]:
+    """Return (btcb_equivalent, pepe_equivalent) from the most recent row where
+    restarting_point is marked (YES/Y/1/TRUE). Falls back to first row if none found.
+    User manually sets 'restarting_point' = 'YES' in the CSV on desired row."""
+    if not os.path.isfile(csv_filename):
+        return 0.0, 0.0
+    try:
+        with open(csv_filename, "r", newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+            if not rows:
+                return 0.0, 0.0
+
+            # Search newest to oldest for restarting point
+            for row in reversed(rows):
+                rp = str(row.get("restarting_point", "")).strip().upper()
+                if rp in ["YES", "Y", "1", "TRUE"]:
+                    return (
+                        float(row.get("btcb_equivalent", 0)),
+                        float(row.get("pepe_equivalent", 0))
+                    )
+            
+            # Fallback to first entry
+            first_row = rows[0]
+            return (
+                float(first_row.get("btcb_equivalent", 0)),
+                float(first_row.get("pepe_equivalent", 0))
+            )
+    except Exception as e:
+        print(f"⚠️  Could not read baseline equivalents for delta calculation: {e}")
+        return 0.0, 0.0
+# ================================================================
+
 def _handle_rate_limit(error_msg: str = "") -> bool:
     """Return True if the error looks like a rate limit (used by both BSC and CoinGecko)."""
     if not error_msg:
@@ -63,20 +116,18 @@ def get_token_balance(w3: Web3, address: str, token_contract: str) -> float:
             return raw_balance / (10 ** decimals)
         except Exception as e:
             error_str = str(e)
-            # Catch HTTP 429, RPC rate-limit messages, etc.
             if (isinstance(e, requests.exceptions.HTTPError) and e.response is not None and e.response.status_code == 429) or \
                _handle_rate_limit(error_str):
                 if attempt < max_attempts - 1:
                     print(f"⚠️  BSC RPC rate limit detected (token balance). Waiting {wait_time} seconds... ({attempt+1}/{max_attempts})")
                     time.sleep(wait_time)
                     continue
-            raise  # non-rate-limit error or max attempts reached
+            raise
     
     raise Exception("Failed to get token balance after maximum rate-limit retries")
 
 
 def get_prices() -> Dict[str, float]:
-    # ✅ precision=full kept for tiny PEPE prices
     url = f"https://api.coingecko.com/api/v3/simple/price?ids={CONFIG['COINGECKO_IDS']}&vs_currencies={CONFIG['VS_CURRENCY']}&precision=full"
     wait_time = CONFIG["RATE_LIMIT_WAIT_SECONDS"]
     max_attempts = 5
@@ -184,8 +235,8 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
     portfolio_btcb_ratio = btcb_value_usd / total_value_usd if total_value_usd > 0 else 0.0
 
     # === CLEARER PRICE RATIOS (intuitive names) ===
-    pepe_per_btcb = prices["btcb"] / prices["pepe"] if prices["pepe"] > 0 else 0.0   # huge number
-    btcb_per_pepe = prices["pepe"] / prices["btcb"] if prices["btcb"] > 0 else 0.0    # tiny number
+    pepe_per_btcb = prices["btcb"] / prices["pepe"] if prices["pepe"] > 0 else 0.0
+    btcb_per_pepe = prices["pepe"] / prices["btcb"] if prices["btcb"] > 0 else 0.0
 
     # === Equivalents & ratios ===
     btcb_equivalent = btcb_balance + (pepe_value_usd / prices["btcb"]) if prices["btcb"] > 0 else btcb_balance
@@ -205,9 +256,21 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
         prices["pepe"]
     )
 
+    # ====================== EQUIVALENTS WITH RESTARTING-POINT DELTAS (TOKEN + USD) ======================
     print("\n🔄 Hypothetical Equivalents (USD as common base):")
-    print(f"   BTCB equivalent : {btcb_equivalent:,.6f} BTCB")
-    print(f"   PEPE equivalent : {pepe_equivalent:,.0f} PEPE")
+    if save_to_csv:
+        baseline_btcb_eq, baseline_pepe_eq = get_baseline_equivalents(CONFIG["CSV_FILENAME"])
+        btcb_equiv_change = btcb_equivalent - baseline_btcb_eq
+        pepe_equiv_change = pepe_equivalent - baseline_pepe_eq
+        btcb_equiv_change_usd = btcb_equiv_change * prices["btcb"]
+        pepe_equiv_change_usd = pepe_equiv_change * prices["pepe"]
+        
+        print(f"   BTCB equivalent : {btcb_equivalent:,.6f} BTCB  (Δ {btcb_equiv_change:+,.6f} | ${btcb_equiv_change_usd:+,.2f})")
+        print(f"   PEPE equivalent : {pepe_equivalent:,.0f} PEPE   (Δ {pepe_equiv_change:+,.0f} | ${pepe_equiv_change_usd:+,.2f})")
+    else:
+        print(f"   BTCB equivalent : {btcb_equivalent:,.6f} BTCB")
+        print(f"   PEPE equivalent : {pepe_equivalent:,.0f} PEPE")
+    # =====================================================================================================
 
     print("\n📈 Price Ratios:")
     print(f"   1 BTCB = {pepe_per_btcb:,.0f} PEPE")
@@ -215,15 +278,34 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
 
     print("\n💰 Current Prices:")
     print(f"   BTCB ≈ ${prices['btcb']:,.2f}")
-    print(f"   PEPE  = ${prices['pepe']:,.18f}")   # ← full precision from CoinGecko
+    print(f"   PEPE  = ${prices['pepe']:,.18f}")
 
-    # CSV — only when save_to_csv=True (first run + manual refresh)
+    # ====================== UPDATED CSV LOGIC ======================
     if save_to_csv:
+        # ←←← balance changes (unchanged)
+        prev_btcb, prev_pepe = get_previous_balances(CONFIG["CSV_FILENAME"])
+        
+        btcb_change = btcb_balance - prev_btcb
+        pepe_change = pepe_balance - prev_pepe
+        btcb_change_usd = btcb_change * prices["btcb"]
+        pepe_change_usd = pepe_change * prices["pepe"]
+
+        # New equivalent changes (token + USD)
+        baseline_btcb_eq, baseline_pepe_eq = get_baseline_equivalents(CONFIG["CSV_FILENAME"])
+        btcb_equiv_change = btcb_equivalent - baseline_btcb_eq
+        pepe_equiv_change = pepe_equivalent - baseline_pepe_eq
+        btcb_equiv_change_usd = btcb_equiv_change * prices["btcb"]
+        pepe_equiv_change_usd = pepe_equiv_change * prices["pepe"]
+
         row = {
             "timestamp_kst": now_kst.isoformat(),
             "readable_time_kst": timestamp_str,
             "btcb_balance": round(btcb_balance, 9),
+            "btcb_balance_change": round(btcb_change, 9),
+            "btcb_balance_change_usd": round(btcb_change_usd, 2),
             "pepe_balance": round(pepe_balance, 2),
+            "pepe_balance_change": round(pepe_change, 2),
+            "pepe_balance_change_usd": round(pepe_change_usd, 2),
             "btcb_price_usd": round(prices["btcb"], 6),
             "pepe_price_usd": round(prices["pepe"], 18),
             "btcb_value_usd": round(btcb_value_usd, 2),
@@ -231,6 +313,11 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
             "total_value_usd": round(total_value_usd, 2),
             "btcb_equivalent": round(btcb_equivalent, 9),
             "pepe_equivalent": round(pepe_equivalent, 2),
+            "btcb_equivalent_change": round(btcb_equiv_change, 9),
+            "pepe_equivalent_change": round(pepe_equiv_change, 2),
+            "btcb_equivalent_change_usd": round(btcb_equiv_change_usd, 2),
+            "pepe_equivalent_change_usd": round(pepe_equiv_change_usd, 2),
+            "restarting_point": "",   # ← User manually sets this to "YES" in CSV to mark restart
             "pepe_per_btcb": round(pepe_per_btcb, 2),
             "btcb_per_pepe": round(btcb_per_pepe, 15),
             "portfolio_btcb_ratio": round(portfolio_btcb_ratio, 6),
@@ -249,6 +336,7 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
         print("   ✅ Portfolio snapshot saved to CSV")
     else:
         print("📄 CSV skipped (automatic refresh)")
+    # =============================================================
 
     return now_kst
 
@@ -261,14 +349,12 @@ def countdown(refresh_interval: int) -> bool:
         print(msg, end="\r")
         sys.stdout.flush()
         
-        # Non-blocking keyboard check every second
         if select.select([sys.stdin], [], [], 1.0)[0]:
             line = sys.stdin.readline().strip().lower()
             if line in ("r", "refresh"):
                 print("\n🔄 Manual refresh triggered!")
-                return True  # signal main loop to save next snapshot
+                return True
         
-    # Timer finished normally → no manual trigger
     print(" " * 100, end="\r")
     return False
 
@@ -308,13 +394,11 @@ def main() -> None:
                 clear_screen()
                 fetch_and_display(address, w3, save_to_csv=save_to_csv_next)
                 
-                # Reset flag (next refresh will skip CSV unless manual trigger)
                 save_to_csv_next = False
                 
-                # Run countdown and check if user triggered manual refresh
                 manual_triggered = countdown(CONFIG["REFRESH_INTERVAL"])
                 if manual_triggered:
-                    save_to_csv_next = True  # next immediate refresh will save to CSV
+                    save_to_csv_next = True
 
         except KeyboardInterrupt:
             clear_screen()
