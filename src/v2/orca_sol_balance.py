@@ -77,7 +77,33 @@ def get_first_equivalents(csv_filename: str) -> tuple[float, float]:
     except Exception as e:
         print(f"⚠️  Could not read first equivalents for delta calculation: {e}")
         return 0.0, 0.0
-# ================================================================
+
+
+def get_cumulative_negative_changes(csv_filename: str) -> tuple[float, float]:
+    """Sum ONLY the negative sol_balance_change_usd and orca_balance_change_usd
+    from the entire CSV history. Returns (cum_sol_neg_usd, cum_orca_neg_usd)."""
+    if not os.path.isfile(csv_filename):
+        return 0.0, 0.0
+    cum_sol = 0.0
+    cum_orca = 0.0
+    try:
+        with open(csv_filename, "r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    sol_chg = float(row.get("sol_balance_change_usd", 0) or 0)
+                    orca_chg = float(row.get("orca_balance_change_usd", 0) or 0)
+                    if sol_chg < 0:
+                        cum_sol += sol_chg
+                    if orca_chg < 0:
+                        cum_orca += orca_chg
+                except (ValueError, TypeError):
+                    continue  # skip any malformed rows
+        return cum_sol, cum_orca
+    except Exception as e:
+        print(f"⚠️  Could not calculate cumulative negative changes: {e}")
+        return 0.0, 0.0
+
 
 def _handle_rate_limit(error_msg: str = "") -> bool:
     """Return True if the error looks like a rate limit (used by all three API functions)."""
@@ -298,6 +324,14 @@ def fetch_and_display(address: str, save_to_csv: bool = False):
         prices["sol"],
         prices["orca"]
     )
+
+    # ====================== CUMULATIVE NEGATIVE CHANGES + DIFFERENCE ======================
+    sol_neg_usd, orca_neg_usd = get_cumulative_negative_changes(CONFIG["CSV_FILENAME"])
+    diff = abs(orca_neg_usd - sol_neg_usd)
+    print("\n📉 Cumulative Negative USD Changes (sum of negative balance changes only):")
+    print(f"   SOL  : ${sol_neg_usd:,.2f}      |      ORCA : ${orca_neg_usd:,.2f}")
+    print(f"   Difference : ${diff:.2f}")
+    # ============================================================================
 
     # ====================== EQUIVALENTS WITH INITIAL BASELINE DELTAS ======================
     print("\n🔄 Hypothetical Equivalents (USD as common base):")
