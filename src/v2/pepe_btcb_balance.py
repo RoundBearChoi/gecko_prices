@@ -79,7 +79,33 @@ def get_first_equivalents(csv_filename: str) -> tuple[float, float]:
     except Exception as e:
         print(f"⚠️  Could not read first equivalents for delta calculation: {e}")
         return 0.0, 0.0
-# ================================================================
+
+
+def get_cumulative_negative_changes(csv_filename: str) -> tuple[float, float]:
+    """Sum ONLY the negative btcb_balance_change_usd and pepe_balance_change_usd
+    from the entire CSV history. Returns (cum_btcb_neg_usd, cum_pepe_neg_usd)."""
+    if not os.path.isfile(csv_filename):
+        return 0.0, 0.0
+    cum_btcb = 0.0
+    cum_pepe = 0.0
+    try:
+        with open(csv_filename, "r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    btcb_chg = float(row.get("btcb_balance_change_usd", 0) or 0)
+                    pepe_chg = float(row.get("pepe_balance_change_usd", 0) or 0)
+                    if btcb_chg < 0:
+                        cum_btcb += btcb_chg
+                    if pepe_chg < 0:
+                        cum_pepe += pepe_chg
+                except (ValueError, TypeError):
+                    continue  # skip any malformed rows
+        return cum_btcb, cum_pepe
+    except Exception as e:
+        print(f"⚠️  Could not calculate cumulative negative changes: {e}")
+        return 0.0, 0.0
+
 
 def _handle_rate_limit(error_msg: str = "") -> bool:
     """Return True if the error looks like a rate limit (used by both BSC and CoinGecko)."""
@@ -245,6 +271,13 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
         prices["pepe"]
     )
 
+    # ====================== NEW: CUMULATIVE NEGATIVE CHANGES ======================
+    btcb_neg_usd, pepe_neg_usd = get_cumulative_negative_changes(CONFIG["CSV_FILENAME"])
+    print("\n📉 Cumulative Negative USD Changes (sum of negative balance changes only):")
+    print(f"   BTCB : ${btcb_neg_usd:,.2f}      |      PEPE : ${pepe_neg_usd:,.2f}")
+    print("   (only counts balance decreases between saved snapshots)")
+    # ============================================================================
+
     # ====================== EQUIVALENTS WITH INITIAL BASELINE DELTAS ======================
     print("\n🔄 Hypothetical Equivalents (USD as common base):")
     if save_to_csv:
@@ -271,7 +304,7 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
 
     # ====================== UPDATED CSV LOGIC ======================
     if save_to_csv:
-        # balance changes vs previous row (unchanged)
+        # balance changes vs previous row
         prev_btcb, prev_pepe = get_previous_balances(CONFIG["CSV_FILENAME"])
         
         btcb_change = btcb_balance - prev_btcb
@@ -279,7 +312,7 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
         btcb_change_usd = btcb_change * prices["btcb"]
         pepe_change_usd = pepe_change * prices["pepe"]
 
-        # equivalent changes vs FIRST row (permanent baseline)
+        # equivalent changes vs FIRST row
         baseline_btcb_eq, baseline_pepe_eq = get_first_equivalents(CONFIG["CSV_FILENAME"])
         btcb_equiv_change = btcb_equivalent - baseline_btcb_eq
         pepe_equiv_change = pepe_equivalent - baseline_pepe_eq
