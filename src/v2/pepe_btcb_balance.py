@@ -41,7 +41,7 @@ CONFIG = {
 
 # ====================== HELPER FUNCTIONS ======================
 def get_previous_balances(csv_filename: str) -> tuple[float, float]:
-    """Return previous (btcb_balance, pepe_balance) from the last CSV row.
+    """Return previous (btcb_balance, pepe_balance) from the LAST CSV row.
     Returns (0.0, 0.0) on first run or if CSV is missing/empty."""
     if not os.path.isfile(csv_filename):
         return 0.0, 0.0
@@ -60,10 +60,10 @@ def get_previous_balances(csv_filename: str) -> tuple[float, float]:
         return 0.0, 0.0
 
 
-def get_baseline_equivalents(csv_filename: str) -> tuple[float, float]:
-    """Return (btcb_equivalent, pepe_equivalent) from the most recent row where
-    restarting_point is marked (YES/Y/1/TRUE). Falls back to first row if none found.
-    User manually sets 'restarting_point' = 'YES' in the CSV on desired row."""
+def get_first_equivalents(csv_filename: str) -> tuple[float, float]:
+    """Return (btcb_equivalent, pepe_equivalent) from the FIRST row in the CSV.
+    This is now the permanent baseline for equivalent change calculations.
+    Returns (0.0, 0.0) on first run or if CSV is missing/empty."""
     if not os.path.isfile(csv_filename):
         return 0.0, 0.0
     try:
@@ -71,24 +71,13 @@ def get_baseline_equivalents(csv_filename: str) -> tuple[float, float]:
             rows = list(csv.DictReader(f))
             if not rows:
                 return 0.0, 0.0
-
-            # Search newest to oldest for restarting point
-            for row in reversed(rows):
-                rp = str(row.get("restarting_point", "")).strip().upper()
-                if rp in ["YES", "Y", "1", "TRUE"]:
-                    return (
-                        float(row.get("btcb_equivalent", 0)),
-                        float(row.get("pepe_equivalent", 0))
-                    )
-            
-            # Fallback to first entry
             first_row = rows[0]
             return (
                 float(first_row.get("btcb_equivalent", 0)),
                 float(first_row.get("pepe_equivalent", 0))
             )
     except Exception as e:
-        print(f"⚠️  Could not read baseline equivalents for delta calculation: {e}")
+        print(f"⚠️  Could not read first equivalents for delta calculation: {e}")
         return 0.0, 0.0
 # ================================================================
 
@@ -256,17 +245,17 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
         prices["pepe"]
     )
 
-    # ====================== EQUIVALENTS WITH RESTARTING-POINT DELTAS (TOKEN + USD) ======================
+    # ====================== EQUIVALENTS WITH INITIAL BASELINE DELTAS ======================
     print("\n🔄 Hypothetical Equivalents (USD as common base):")
     if save_to_csv:
-        baseline_btcb_eq, baseline_pepe_eq = get_baseline_equivalents(CONFIG["CSV_FILENAME"])
+        baseline_btcb_eq, baseline_pepe_eq = get_first_equivalents(CONFIG["CSV_FILENAME"])
         btcb_equiv_change = btcb_equivalent - baseline_btcb_eq
         pepe_equiv_change = pepe_equivalent - baseline_pepe_eq
         btcb_equiv_change_usd = btcb_equiv_change * prices["btcb"]
         pepe_equiv_change_usd = pepe_equiv_change * prices["pepe"]
         
-        print(f"   BTCB equivalent : {btcb_equivalent:,.6f} BTCB  (Δ {btcb_equiv_change:+,.6f} | ${btcb_equiv_change_usd:+,.2f})")
-        print(f"   PEPE equivalent : {pepe_equivalent:,.0f} PEPE   (Δ {pepe_equiv_change:+,.0f} | ${pepe_equiv_change_usd:+,.2f})")
+        print(f"   BTCB equivalent : {btcb_equivalent:,.6f} BTCB  (Δ {btcb_equiv_change:+,.6f} | ${btcb_equiv_change_usd:+,.2f} vs initial)")
+        print(f"   PEPE equivalent : {pepe_equivalent:,.0f} PEPE   (Δ {pepe_equiv_change:+,.0f} | ${pepe_equiv_change_usd:+,.2f} vs initial)")
     else:
         print(f"   BTCB equivalent : {btcb_equivalent:,.6f} BTCB")
         print(f"   PEPE equivalent : {pepe_equivalent:,.0f} PEPE")
@@ -282,7 +271,7 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
 
     # ====================== UPDATED CSV LOGIC ======================
     if save_to_csv:
-        # ←←← balance changes (unchanged)
+        # balance changes vs previous row (unchanged)
         prev_btcb, prev_pepe = get_previous_balances(CONFIG["CSV_FILENAME"])
         
         btcb_change = btcb_balance - prev_btcb
@@ -290,8 +279,8 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
         btcb_change_usd = btcb_change * prices["btcb"]
         pepe_change_usd = pepe_change * prices["pepe"]
 
-        # New equivalent changes (token + USD)
-        baseline_btcb_eq, baseline_pepe_eq = get_baseline_equivalents(CONFIG["CSV_FILENAME"])
+        # equivalent changes vs FIRST row (permanent baseline)
+        baseline_btcb_eq, baseline_pepe_eq = get_first_equivalents(CONFIG["CSV_FILENAME"])
         btcb_equiv_change = btcb_equivalent - baseline_btcb_eq
         pepe_equiv_change = pepe_equivalent - baseline_pepe_eq
         btcb_equiv_change_usd = btcb_equiv_change * prices["btcb"]
@@ -317,7 +306,6 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
             "pepe_equivalent_change": round(pepe_equiv_change, 2),
             "btcb_equivalent_change_usd": round(btcb_equiv_change_usd, 2),
             "pepe_equivalent_change_usd": round(pepe_equiv_change_usd, 2),
-            "restarting_point": "",   # ← User manually sets this to "YES" in CSV to mark restart
             "pepe_per_btcb": round(pepe_per_btcb, 2),
             "btcb_per_pepe": round(btcb_per_pepe, 15),
             "portfolio_btcb_ratio": round(portfolio_btcb_ratio, 6),
