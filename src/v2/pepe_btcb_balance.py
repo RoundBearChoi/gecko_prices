@@ -279,20 +279,17 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
     print(f"   Difference : ${diff:.2f}")
     # ============================================================================
 
-    # ====================== EQUIVALENTS WITH INITIAL BASELINE DELTAS ======================
+    # ====================== EQUIVALENTS WITH INITIAL BASELINE DELTAS (ALWAYS SHOWN) ======================
     print("\n🔄 Hypothetical Equivalents (USD as common base):")
-    if save_to_csv:
-        baseline_btcb_eq, baseline_pepe_eq = get_first_equivalents(CONFIG["CSV_FILENAME"])
-        btcb_equiv_change = btcb_equivalent - baseline_btcb_eq
-        pepe_equiv_change = pepe_equivalent - baseline_pepe_eq
-        btcb_equiv_change_usd = btcb_equiv_change * prices["btcb"]
-        pepe_equiv_change_usd = pepe_equiv_change * prices["pepe"]
-        
-        print(f"   BTCB equivalent : {btcb_equivalent:,.6f} BTCB  (Δ {btcb_equiv_change:+,.6f} | ${btcb_equiv_change_usd:+,.2f} vs initial)")
-        print(f"   PEPE equivalent : {pepe_equivalent:,.0f} PEPE   (Δ {pepe_equiv_change:+,.0f} | ${pepe_equiv_change_usd:+,.2f} vs initial)")
-    else:
-        print(f"   BTCB equivalent : {btcb_equivalent:,.6f} BTCB")
-        print(f"   PEPE equivalent : {pepe_equivalent:,.0f} PEPE")
+    
+    baseline_btcb_eq, baseline_pepe_eq = get_first_equivalents(CONFIG["CSV_FILENAME"])
+    btcb_equiv_change = btcb_equivalent - baseline_btcb_eq
+    pepe_equiv_change = pepe_equivalent - baseline_pepe_eq
+    btcb_equiv_change_usd = btcb_equiv_change * prices["btcb"]
+    pepe_equiv_change_usd = pepe_equiv_change * prices["pepe"]
+    
+    print(f"   BTCB equivalent : {btcb_equivalent:,.6f} BTCB  (Δ {btcb_equiv_change:+,.6f} | ${btcb_equiv_change_usd:+,.2f} vs initial)")
+    print(f"   PEPE equivalent : {pepe_equivalent:,.0f} PEPE   (Δ {pepe_equiv_change:+,.0f} | ${pepe_equiv_change_usd:+,.2f} vs initial)")
     # =====================================================================================================
 
     print("\n📈 Price Ratios:")
