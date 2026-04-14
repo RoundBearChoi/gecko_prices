@@ -35,7 +35,7 @@ CONFIG = {
     "UPDATE_ONCE": False,
     
     # ==================== RATE LIMIT SETTINGS ====================
-    "RATE_LIMIT_WAIT_SECONDS": 180,  # 3 minutes FIXED wait on rate limit (no backoff)
+    "RATE_LIMIT_WAIT_SECONDS": 60*2,
 }
 # ================================================================
 
@@ -302,6 +302,7 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
     print("\n💰 Current Prices:")
     print(f"   BTCB ≈ ${prices['btcb']:,.2f}")
     print(f"   PEPE  = ${prices['pepe']:,.18f}")
+    print('')
 
     # ====================== UPDATED CSV LOGIC ======================
     if save_to_csv:

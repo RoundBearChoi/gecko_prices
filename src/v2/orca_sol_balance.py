@@ -33,7 +33,7 @@ CONFIG = {
     "UPDATE_ONCE": False,            # True = one-time run, False = live with countdown
     
     # ==================== RATE LIMIT SETTINGS ====================
-    "RATE_LIMIT_WAIT_SECONDS": 180,  # 3 minutes FIXED wait on rate limit (no backoff)
+    "RATE_LIMIT_WAIT_SECONDS": 60*2,
 }
 # ================================================================
 
@@ -356,6 +356,7 @@ def fetch_and_display(address: str, save_to_csv: bool = False):
     print("\n💰 Current Prices:")
     print(f"   SOL  = ${prices['sol']:,.2f}")
     print(f"   ORCA = ${prices['orca']:,.4f}")
+    print('')
 
     # ====================== UPDATED CSV LOGIC WITH NEW COLUMNS ======================
     if save_to_csv:
