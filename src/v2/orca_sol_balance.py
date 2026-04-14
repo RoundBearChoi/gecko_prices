@@ -274,11 +274,11 @@ def print_portfolio_bar(orca_ratio: float, sol_balance: float, orca_balance: flo
         if excess_usd >= 0:
             sol_to_sell = excess_usd / sol_price
             orca_to_buy = excess_usd / orca_price
-            print(f"   🔄 To reach perfect 50:50 → Sell ~{sol_to_sell:,.6f} SOL (~${excess_usd:,.2f} USD) to buy ~{orca_to_buy:,.4f} ORCA")
+            print(f"   To reach perfect 50:50 → Sell ~{sol_to_sell:,.6f} SOL (~${excess_usd:,.2f} USD) to buy ~{orca_to_buy:,.4f} ORCA")
         else:
             orca_to_sell = abs(excess_usd) / orca_price
             sol_to_buy = abs(excess_usd) / sol_price
-            print(f"   🔄 To reach perfect 50:50 → Sell ~{orca_to_sell:,.4f} ORCA (~${abs(excess_usd):,.2f} USD) to buy ~{sol_to_buy:,.6f} SOL")
+            print(f"   To reach perfect 50:50 → Sell ~{orca_to_sell:,.4f} ORCA (~${abs(excess_usd):,.2f} USD) to buy ~{sol_to_buy:,.6f} SOL")
     else:
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
 

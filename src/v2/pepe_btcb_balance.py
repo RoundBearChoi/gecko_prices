@@ -217,11 +217,11 @@ def print_portfolio_bar(btcb_ratio: float, btcb_balance: float, pepe_balance: fl
         if excess_usd >= 0:
             btcb_to_sell = excess_usd / btcb_price
             pepe_to_buy = excess_usd / pepe_price
-            print(f"   🔄 To reach perfect 50:50 → Sell ~{btcb_to_sell:,.6f} BTCB (~${excess_usd:,.2f} USD) to buy ~{pepe_to_buy:,.0f} PEPE")
+            print(f"   To reach perfect 50:50 → Sell ~{btcb_to_sell:,.6f} BTCB (~${excess_usd:,.2f} USD) to buy ~{pepe_to_buy:,.0f} PEPE")
         else:
             pepe_to_sell = abs(excess_usd) / pepe_price
             btcb_to_buy = abs(excess_usd) / btcb_price
-            print(f"   🔄 To reach perfect 50:50 → Sell ~{pepe_to_sell:,.0f} PEPE (~${abs(excess_usd):,.2f} USD) to buy ~{btcb_to_buy:,.6f} BTCB")
+            print(f"   To reach perfect 50:50 → Sell ~{pepe_to_sell:,.0f} PEPE (~${abs(excess_usd):,.2f} USD) to buy ~{btcb_to_buy:,.6f} BTCB")
     else:
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
 
