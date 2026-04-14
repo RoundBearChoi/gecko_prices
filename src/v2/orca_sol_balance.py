@@ -37,6 +37,48 @@ CONFIG = {
 }
 # ================================================================
 
+# ====================== HELPER FUNCTIONS ======================
+def get_previous_balances(csv_filename: str) -> tuple[float, float]:
+    """Return previous (sol_balance, orca_balance) from the LAST CSV row.
+    Returns (0.0, 0.0) on first run or if CSV is missing/empty."""
+    if not os.path.isfile(csv_filename):
+        return 0.0, 0.0
+    try:
+        with open(csv_filename, "r", newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+            if not rows:
+                return 0.0, 0.0
+            last_row = rows[-1]
+            return (
+                float(last_row.get("sol_balance", 0)),
+                float(last_row.get("orca_balance", 0))
+            )
+    except Exception as e:
+        print(f"⚠️  Could not read previous balances for delta calculation: {e}")
+        return 0.0, 0.0
+
+
+def get_first_equivalents(csv_filename: str) -> tuple[float, float]:
+    """Return (sol_equivalent, orca_equivalent) from the FIRST row in the CSV.
+    This is now the permanent baseline for equivalent change calculations.
+    Returns (0.0, 0.0) on first run or if CSV is missing/empty."""
+    if not os.path.isfile(csv_filename):
+        return 0.0, 0.0
+    try:
+        with open(csv_filename, "r", newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+            if not rows:
+                return 0.0, 0.0
+            first_row = rows[0]
+            return (
+                float(first_row.get("sol_equivalent", 0)),
+                float(first_row.get("orca_equivalent", 0))
+            )
+    except Exception as e:
+        print(f"⚠️  Could not read first equivalents for delta calculation: {e}")
+        return 0.0, 0.0
+# ================================================================
+
 def _handle_rate_limit(error_msg: str = "") -> bool:
     """Return True if the error looks like a rate limit (used by all three API functions)."""
     if not error_msg:
@@ -75,7 +117,6 @@ def get_sol_balance(rpc_url: str, pubkey: str) -> float:
                     continue
             raise
         except Exception as e:
-            # Only retry on rate-limit-like errors; everything else fails immediately
             if attempt < max_attempts - 1 and _handle_rate_limit(str(e)):
                 print(f"⚠️  Rate limit (unexpected) detected. Waiting {wait_time} seconds...")
                 time.sleep(wait_time)
@@ -258,9 +299,21 @@ def fetch_and_display(address: str, save_to_csv: bool = False):
         prices["orca"]
     )
 
+    # ====================== EQUIVALENTS WITH INITIAL BASELINE DELTAS ======================
     print("\n🔄 Hypothetical Equivalents (USD as common base):")
-    print(f"   SOL equivalent   : {sol_equivalent:,.6f} SOL")
-    print(f"   ORCA equivalent  : {orca_equivalent:,.6f} ORCA")
+    if save_to_csv:
+        baseline_sol_eq, baseline_orca_eq = get_first_equivalents(CONFIG["CSV_FILENAME"])
+        sol_equiv_change = sol_equivalent - baseline_sol_eq
+        orca_equiv_change = orca_equivalent - baseline_orca_eq
+        sol_equiv_change_usd = sol_equiv_change * prices["sol"]
+        orca_equiv_change_usd = orca_equiv_change * prices["orca"]
+        
+        print(f"   SOL equivalent   : {sol_equivalent:,.6f} SOL  (Δ {sol_equiv_change:+,.6f} | ${sol_equiv_change_usd:+,.2f} vs initial)")
+        print(f"   ORCA equivalent  : {orca_equivalent:,.6f} ORCA (Δ {orca_equiv_change:+,.6f} | ${orca_equiv_change_usd:+,.2f} vs initial)")
+    else:
+        print(f"   SOL equivalent   : {sol_equivalent:,.6f} SOL")
+        print(f"   ORCA equivalent  : {orca_equivalent:,.6f} ORCA")
+    # =====================================================================================================
 
     print("\n📈 Price Ratios:")
     print(f"   1 SOL  = {orca_per_sol:,.2f} ORCA")
@@ -270,13 +323,32 @@ def fetch_and_display(address: str, save_to_csv: bool = False):
     print(f"   SOL  = ${prices['sol']:,.2f}")
     print(f"   ORCA = ${prices['orca']:,.4f}")
 
-    # CSV logic — now controlled by save_to_csv flag
+    # ====================== UPDATED CSV LOGIC WITH NEW COLUMNS ======================
     if save_to_csv:
+        # balance changes vs previous row
+        prev_sol, prev_orca = get_previous_balances(CONFIG["CSV_FILENAME"])
+        
+        sol_change = sol_balance - prev_sol
+        orca_change = orca_balance - prev_orca
+        sol_change_usd = sol_change * prices["sol"]
+        orca_change_usd = orca_change * prices["orca"]
+
+        # equivalent changes vs FIRST row (permanent baseline)
+        baseline_sol_eq, baseline_orca_eq = get_first_equivalents(CONFIG["CSV_FILENAME"])
+        sol_equiv_change = sol_equivalent - baseline_sol_eq
+        orca_equiv_change = orca_equivalent - baseline_orca_eq
+        sol_equiv_change_usd = sol_equiv_change * prices["sol"]
+        orca_equiv_change_usd = orca_equiv_change * prices["orca"]
+
         row = {
             "timestamp_kst": now_kst.isoformat(),
             "readable_time_kst": timestamp_str,
             "sol_balance": round(sol_balance, 9),
+            "sol_balance_change": round(sol_change, 9),
+            "sol_balance_change_usd": round(sol_change_usd, 2),
             "orca_balance": round(orca_balance, 9),
+            "orca_balance_change": round(orca_change, 9),
+            "orca_balance_change_usd": round(orca_change_usd, 2),
             "sol_price_usd": round(prices["sol"], 6),
             "orca_price_usd": round(prices["orca"], 6),
             "sol_value_usd": round(sol_value_usd, 2),
@@ -284,6 +356,10 @@ def fetch_and_display(address: str, save_to_csv: bool = False):
             "total_value_usd": round(total_value_usd, 2),
             "sol_equivalent": round(sol_equivalent, 9),
             "orca_equivalent": round(orca_equivalent, 9),
+            "sol_equivalent_change": round(sol_equiv_change, 9),
+            "orca_equivalent_change": round(orca_equiv_change, 9),
+            "sol_equivalent_change_usd": round(sol_equiv_change_usd, 2),
+            "orca_equivalent_change_usd": round(orca_equiv_change_usd, 2),
             "orca_per_sol": round(orca_per_sol, 6),
             "sol_per_orca": round(sol_per_orca, 8),
             "portfolio_orca_ratio": round(portfolio_orca_ratio, 6),
