@@ -235,7 +235,7 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
     print("\n📊 Current Balances:")
     print(f"   BTCB  : {btcb_balance:,.6f} BTCB  (${btcb_value_usd:,.2f})")
     print(f"   PEPE  : {pepe_balance:,.0f} PEPE (${pepe_value_usd:,.2f})")
-    print(f"   TOTAL (BTCB+PEPE): ${total_value_usd:,.2f}")
+    print(f"   TOTAL : ${total_value_usd:,.2f}")
 
     print_portfolio_bar(
         portfolio_btcb_ratio,
