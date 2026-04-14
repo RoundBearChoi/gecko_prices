@@ -405,13 +405,12 @@ def fetch_and_display(address: str, save_to_csv: bool = False):
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             if not file_exists:
                 writer.writeheader()
-                print(f"📄 Created new CSV file: {CONFIG['CSV_FILENAME']}")
+                print(f"Created new CSV file: {CONFIG['CSV_FILENAME']}")
             else:
-                print(f"📄 Appended manual refresh data to: {CONFIG['CSV_FILENAME']}")
+                print(f"Appended manual refresh data to: {CONFIG['CSV_FILENAME']}")
             writer.writerow(row)
-        print("   ✅ Portfolio snapshot saved to CSV")
     else:
-        print("📄 CSV skipped (automatic refresh)")
+        print("CSV skipped (automatic refresh)")
 
     return now_kst
 
@@ -420,7 +419,7 @@ def countdown(refresh_interval: int) -> bool:
     """Live countdown with manual 'r' + Enter refresh trigger.
     Returns True if manual refresh was triggered, False if timer finished normally."""
     for remaining in range(refresh_interval, 0, -1):
-        msg = f"⏳ Next refresh in {remaining:2d}s... (press r then Enter to refresh now, Ctrl+C to stop)"
+        msg = f"Next refresh in {remaining:2d}s... (press r then Enter to refresh now, Ctrl+C to stop)"
         print(msg, end="\r")
         sys.stdout.flush()
         
