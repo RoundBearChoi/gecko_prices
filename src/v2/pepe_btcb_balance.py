@@ -271,11 +271,12 @@ def fetch_and_display(address: str, w3: Web3, save_to_csv: bool = False):
         prices["pepe"]
     )
 
-    # ====================== NEW: CUMULATIVE NEGATIVE CHANGES ======================
+    # ====================== UPDATED: CUMULATIVE NEGATIVE CHANGES + DIFFERENCE ======================
     btcb_neg_usd, pepe_neg_usd = get_cumulative_negative_changes(CONFIG["CSV_FILENAME"])
+    diff = abs(pepe_neg_usd - btcb_neg_usd)
     print("\n📉 Cumulative Negative USD Changes (sum of negative balance changes only):")
     print(f"   BTCB : ${btcb_neg_usd:,.2f}      |      PEPE : ${pepe_neg_usd:,.2f}")
-    print("   (only counts balance decreases between saved snapshots)")
+    print(f"   Difference : ${diff:.2f}")
     # ============================================================================
 
     # ====================== EQUIVALENTS WITH INITIAL BASELINE DELTAS ======================
