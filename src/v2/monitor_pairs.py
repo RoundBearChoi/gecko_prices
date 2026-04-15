@@ -40,7 +40,7 @@ PORTFOLIOS = {
         "rpc_url": "https://bsc-dataseed.binance.org/",
         "csv_filename": "btcb_pepe_balances.csv",
         "asset1": {"symbol": "BTCB",  "cg_id": "binance-bitcoin", "balance_prec": 6, "price_prec": 2, "col_prefix": "btcb"},
-        "asset2": {"symbol": "PEPE",  "cg_id": "pepe",            "balance_prec": 0, "price_prec": 18, "col_prefix": "pepe"},
+        "asset2": {"symbol": "PEPE",  "cg_id": "pepe",            "balance_prec": 2, "price_prec": 18, "col_prefix": "pepe"},   # ← changed to 2 for console
         "bar_char1": "█",
         "bar_char2": "─",
         "btcb_contract": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
@@ -295,9 +295,8 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print(f"   {a1['symbol']} ≈ ${price1:,.{a1['price_prec']}f}")
     print(f"   {a2['symbol']}  = ${price2:,.{a2['price_prec']}f}")
 
-    # ====================== CSV WRITING (FULLY RESTORED) ======================
+    # ====================== CSV WRITING (PEPE = 4 decimals in CSV) ======================
     if save_to_csv:
-        # Balance changes vs previous row
         prev_col1 = f"{a1['col_prefix']}_balance"
         prev_col2 = f"{a2['col_prefix']}_balance"
         prev1, prev2 = get_previous_balances(portfolio["csv_filename"], prev_col1, prev_col2)
@@ -307,10 +306,12 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
         change_usd1 = change1 * price1
         change_usd2 = change2 * price2
 
-        # Equivalent changes vs FIRST row (permanent baseline)
         base1, base2 = get_first_equivalents(portfolio["csv_filename"], f"{a1['col_prefix']}_equivalent", f"{a2['col_prefix']}_equivalent")
         delta1 = equiv1 - base1
         delta2 = equiv2 - base2
+
+        # PEPE uses 4 decimals in CSV (console now uses 2 via config)
+        pepe_csv_round = 4 if a2['symbol'] == "PEPE" else 9
 
         row = {
             "timestamp_kst": now_kst.isoformat(),
@@ -318,8 +319,8 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
             f"{a1['col_prefix']}_balance": round(bal1, 9),
             f"{a1['col_prefix']}_balance_change": round(change1, 9),
             f"{a1['col_prefix']}_balance_change_usd": round(change_usd1, 2),
-            f"{a2['col_prefix']}_balance": round(bal2, 9 if a2['symbol'] != "PEPE" else 2),
-            f"{a2['col_prefix']}_balance_change": round(change2, 9 if a2['symbol'] != "PEPE" else 2),
+            f"{a2['col_prefix']}_balance": round(bal2, pepe_csv_round),
+            f"{a2['col_prefix']}_balance_change": round(change2, pepe_csv_round),
             f"{a2['col_prefix']}_balance_change_usd": round(change_usd2, 2),
             f"{a1['col_prefix']}_price_usd": round(price1, 6),
             f"{a2['col_prefix']}_price_usd": round(price2, 18 if a2['symbol'] == "PEPE" else 6),
@@ -327,9 +328,9 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
             f"{a2['col_prefix']}_value_usd": round(val2, 2),
             "total_value_usd": round(total_usd, 2),
             f"{a1['col_prefix']}_equivalent": round(equiv1, 9),
-            f"{a2['col_prefix']}_equivalent": round(equiv2, 9 if a2['symbol'] != "PEPE" else 2),
+            f"{a2['col_prefix']}_equivalent": round(equiv2, pepe_csv_round),
             f"{a1['col_prefix']}_equivalent_change": round(delta1, 9),
-            f"{a2['col_prefix']}_equivalent_change": round(delta2, 9 if a2['symbol'] != "PEPE" else 2),
+            f"{a2['col_prefix']}_equivalent_change": round(delta2, pepe_csv_round),
             f"{a1['col_prefix']}_equivalent_change_usd": round(delta1 * price1, 2),
             f"{a2['col_prefix']}_equivalent_change_usd": round(delta2 * price2, 2),
             f"{a2['col_prefix']}_per_{a1['col_prefix']}": round(ratio_1_to_2, 6),
@@ -384,7 +385,7 @@ def main():
     print(f"🔄 Live monitoring {portfolio['name']} — refresh every {BASE_CONFIG['REFRESH_INTERVAL']}s")
     print("   Press 'r' + Enter anytime for manual refresh + CSV save\n")
 
-    save_next = True   # First run always saves
+    save_next = True
     try:
         while True:
             clear_screen()
