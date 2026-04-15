@@ -120,7 +120,6 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def countdown(refresh_interval: int) -> bool:
-    print('')
     for remaining in range(refresh_interval, 0, -1):
         print(f"Next refresh in {remaining:2d}s... (press r then Enter to refresh now, Ctrl+C to stop)", end="\r")
         sys.stdout.flush()
@@ -257,9 +256,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     equiv1 = bal1 + (val2 / price1) if price1 > 0 else bal1
     equiv2 = bal2 + (val1 / price2) if price2 > 0 else bal2
 
-    ratio_1_to_2 = price1 / price2 if price2 > 0 else 0
-    ratio_2_to_1 = price2 / price1 if price1 > 0 else 0
-
     # ====================== CSV WRITING ======================
     if save_to_csv:
         a1 = portfolio["asset1"]
@@ -302,8 +298,8 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
             f"{a2['col_prefix']}_equivalent_change": round(delta2, pepe_csv_round),
             f"{a1['col_prefix']}_equivalent_change_usd": round(delta1 * price1, 2),
             f"{a2['col_prefix']}_equivalent_change_usd": round(delta2 * price2, 2),
-            f"{a2['col_prefix']}_per_{a1['col_prefix']}": round(ratio_1_to_2, 6),
-            f"{a1['col_prefix']}_per_{a2['col_prefix']}": round(ratio_2_to_1, 15),
+            f"{a2['col_prefix']}_per_{a1['col_prefix']}": round(ratio_1_to_2, 6) if 'ratio_1_to_2' in locals() else 0,
+            f"{a1['col_prefix']}_per_{a2['col_prefix']}": round(ratio_2_to_1, 15) if 'ratio_2_to_1' in locals() else 0,
             f"portfolio_{a1['col_prefix']}_ratio": round(ratio1, 6),
             f"portfolio_{a2['col_prefix']}_ratio": round(1 - ratio1, 6),
         }
@@ -330,7 +326,7 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print_portfolio_bar(a1["symbol"], a2["symbol"], ratio1, bal1, bal2, price1, price2,
                         portfolio["bar_char1"], portfolio["bar_char2"])
 
-    # ====================== CUMULATIVE NEGATIVE USD CHANGES + VISUAL BAR + SKEW % ======================
+    # ====================== CUMULATIVE NEGATIVE USD CHANGES + VISUAL BAR + SKEW ======================
     chg_col1 = f"{a1['col_prefix']}_balance_change_usd"
     chg_col2 = f"{a2['col_prefix']}_balance_change_usd"
     neg1, neg2 = get_cumulative_negative_changes(portfolio["csv_filename"], chg_col1, chg_col2)
@@ -343,7 +339,7 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     abs_neg2 = abs(neg2)
     total_loss = abs_neg1 + abs_neg2
 
-    # Balance Ratio (1.0x = perfectly equal cumulative negative USD)
+    # Balance Ratio
     if total_loss < 1e-6:
         balance_ratio = "1.00x"
         note = "(no losses recorded yet)"
@@ -360,15 +356,15 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
 
     print(f"   Balance Ratio ({a1['symbol']}/{a2['symbol']}): {balance_ratio}{note}")
 
-    # ====================== SKEW PERCENTAGE (with emoji for emphasis) ======================
+    # Skew line with emoji
     if total_loss > 1:
         loss_ratio1 = abs_neg1 / total_loss
         skew_pct = abs(loss_ratio1 * 100 - 50)
         skew_towards = a1['symbol'] if loss_ratio1 > 0.5 else a2['symbol']
         print(f"   ⚖️ Skew: {skew_pct:.1f}% towards {skew_towards}")
 
-    # ====================== VISUAL LOSS DISTRIBUTION BAR ======================
-    if total_loss > 1:  # avoid tiny-noise bars
+    # Visual Loss Bar
+    if total_loss > 1:
         loss_ratio1 = abs_neg1 / total_loss
         w = BASE_CONFIG["BAR_WIDTH"]
         blocks1 = int(round(loss_ratio1 * w))
@@ -391,8 +387,7 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     else:
         print("\n📊 Cumulative Loss Distribution: (No significant losses recorded yet)")
 
-    # ====================== REMAINING DISPLAY ======================
-    # Equivalents with baseline
+    # Remaining display
     print("\n🔄 Hypothetical Equivalents (USD base):")
     base_col1 = f"{a1['col_prefix']}_equivalent"
     base_col2 = f"{a2['col_prefix']}_equivalent"
