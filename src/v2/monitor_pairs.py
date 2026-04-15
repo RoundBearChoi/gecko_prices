@@ -259,7 +259,7 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     ratio_1_to_2 = price1 / price2 if price2 > 0 else 0
     ratio_2_to_1 = price2 / price1 if price1 > 0 else 0
 
-    # ====================== CSV WRITING (moved here so cumulative updates immediately) ======================
+    # ====================== CSV WRITING ======================
     if save_to_csv:
         a1 = portfolio["asset1"]
         a2 = portfolio["asset2"]
@@ -279,7 +279,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
         delta1 = equiv1 - base1
         delta2 = equiv2 - base2
 
-        # PEPE uses 4 decimals in CSV (console now uses 2 via config)
         pepe_csv_round = 4 if a2['symbol'] == "PEPE" else 9
 
         row = {
@@ -319,7 +318,7 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
                 print(f"✅ Appended new row to: {portfolio['csv_filename']}")
             writer.writerow(row)
 
-    # ====================== DISPLAY SECTION (now sees the freshly written CSV) ======================
+    # ====================== DISPLAY SECTION ======================
     print("\n📊 Current Balances:")
     a1 = portfolio["asset1"]
     a2 = portfolio["asset2"]
@@ -330,14 +329,58 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print_portfolio_bar(a1["symbol"], a2["symbol"], ratio1, bal1, bal2, price1, price2,
                         portfolio["bar_char1"], portfolio["bar_char2"])
 
-    # Cumulative negative changes (now includes the row we just wrote)
+    # ====================== CUMULATIVE NEGATIVE USD CHANGES + VISUAL BAR ======================
     chg_col1 = f"{a1['col_prefix']}_balance_change_usd"
     chg_col2 = f"{a2['col_prefix']}_balance_change_usd"
     neg1, neg2 = get_cumulative_negative_changes(portfolio["csv_filename"], chg_col1, chg_col2)
+
     print("\n📉 Cumulative Negative USD Changes:")
     print(f"   {a1['symbol']:4} : ${neg1:,.2f}      |      {a2['symbol']:4} : ${neg2:,.2f}")
     print(f"   Difference : ${abs(neg2 - neg1):.2f}")
 
+    abs_neg1 = abs(neg1)
+    abs_neg2 = abs(neg2)
+    total_loss = abs_neg1 + abs_neg2
+
+    # Balance Ratio (1.0x = perfectly equal cumulative negative USD)
+    if total_loss < 1e-6:
+        balance_ratio = "1.00x"
+        note = "(no losses recorded yet)"
+    elif abs_neg2 < 1e-6:
+        balance_ratio = "∞"
+        note = f"(only {a1['symbol']} has losses)"
+    elif abs_neg1 < 1e-6:
+        balance_ratio = "0.00x"
+        note = f"(only {a2['symbol']} has losses)"
+    else:
+        ratio = abs_neg1 / abs_neg2
+        balance_ratio = f"{ratio:.2f}x"
+        note = " (1.0x = perfectly balanced)"
+
+    print(f"   Balance Ratio ({a1['symbol']}/{a2['symbol']}): {balance_ratio}{note}")
+
+    # ====================== VISUAL LOSS DISTRIBUTION BAR ======================
+    if total_loss > 1:  # avoid tiny-noise bars
+        loss_ratio1 = abs_neg1 / total_loss
+        w = BASE_CONFIG["BAR_WIDTH"]
+        blocks1 = int(round(loss_ratio1 * w))
+        bar = portfolio["bar_char1"] * blocks1 + portfolio["bar_char2"] * (w - blocks1)
+
+        prec = BASE_CONFIG["PERCENT_PRECISION"]
+        label1 = f"{loss_ratio1*100:.{prec}f}% {a1['symbol']}"
+        label2 = f"{(1-loss_ratio1)*100:.{prec}f}% {a2['symbol']}"
+
+        print("\n📊 Cumulative Loss Distribution:")
+        if BASE_CONFIG["SHOW_HEADER_LABELS"]:
+            padding = " " * (w - len(a1['symbol']) - len(a2['symbol']))
+            print(f"   {a1['symbol']}{padding}{a2['symbol']}")
+        print(f"   {bar}")
+        spacing = w - len(label1) - len(label2) + 8
+        print(f"   {label1}{' ' * spacing}{label2}")
+        if BASE_CONFIG["SHOW_50_PERCENT_MARKER"]:
+            print(f"   {'50% ideal balance':^{w}}")
+
+    # ====================== REMAINING DISPLAY ======================
     # Equivalents with baseline
     print("\n🔄 Hypothetical Equivalents (USD base):")
     base_col1 = f"{a1['col_prefix']}_equivalent"
@@ -355,6 +398,7 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print("\n💰 Current Prices:")
     print(f"   {a1['symbol']} ≈ ${price1:,.{a1['price_prec']}f}")
     print(f"   {a2['symbol']}  = ${price2:,.{a2['price_prec']}f}")
+    print('')
 
     if not save_to_csv:
         print("CSV skipped (automatic refresh)")
