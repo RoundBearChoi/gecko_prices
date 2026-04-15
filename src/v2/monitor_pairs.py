@@ -21,7 +21,7 @@ BASE_CONFIG = {
     "RATE_LIMIT_WAIT_SECONDS": 60 * 2,
 }
 
-# ========================= PORTFOLIO CONFIGS =========================
+# ========================= PORTFOLIOS CONFIGS =========================
 PORTFOLIOS = {
     "1": {  # SOL + ORCA (Solana)
         "name": "ORCA + SOL (Solana)",
@@ -40,7 +40,7 @@ PORTFOLIOS = {
         "rpc_url": "https://bsc-dataseed.binance.org/",
         "csv_filename": "btcb_pepe_balances.csv",
         "asset1": {"symbol": "BTCB",  "cg_id": "binance-bitcoin", "balance_prec": 6, "price_prec": 2, "col_prefix": "btcb"},
-        "asset2": {"symbol": "PEPE",  "cg_id": "pepe",            "balance_prec": 2, "price_prec": 18, "col_prefix": "pepe"},   # ← changed to 2 for console
+        "asset2": {"symbol": "PEPE",  "cg_id": "pepe",            "balance_prec": 2, "price_prec": 18, "col_prefix": "pepe"},
         "bar_char1": "█",
         "bar_char2": "─",
         "btcb_contract": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
@@ -259,44 +259,11 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     ratio_1_to_2 = price1 / price2 if price2 > 0 else 0
     ratio_2_to_1 = price2 / price1 if price1 > 0 else 0
 
-    print("\n📊 Current Balances:")
-    a1 = portfolio["asset1"]
-    a2 = portfolio["asset2"]
-    print(f"   {a1['symbol']:4} : {bal1:,.{a1['balance_prec']}f} {a1['symbol']} (${val1:,.2f})")
-    print(f"   {a2['symbol']:4} : {bal2:,.{a2['balance_prec']}f} {a2['symbol']} (${val2:,.2f})")
-    print(f"   TOTAL : ${total_usd:,.2f}")
-
-    print_portfolio_bar(a1["symbol"], a2["symbol"], ratio1, bal1, bal2, price1, price2,
-                        portfolio["bar_char1"], portfolio["bar_char2"])
-
-    # Cumulative negative changes
-    chg_col1 = f"{a1['col_prefix']}_balance_change_usd"
-    chg_col2 = f"{a2['col_prefix']}_balance_change_usd"
-    neg1, neg2 = get_cumulative_negative_changes(portfolio["csv_filename"], chg_col1, chg_col2)
-    print("\n📉 Cumulative Negative USD Changes:")
-    print(f"   {a1['symbol']:4} : ${neg1:,.2f}      |      {a2['symbol']:4} : ${neg2:,.2f}")
-    print(f"   Difference : ${abs(neg2 - neg1):.2f}")
-
-    # Equivalents with baseline
-    print("\n🔄 Hypothetical Equivalents (USD base):")
-    base_col1 = f"{a1['col_prefix']}_equivalent"
-    base_col2 = f"{a2['col_prefix']}_equivalent"
-    base1, base2 = get_first_equivalents(portfolio["csv_filename"], base_col1, base_col2)
-    delta1 = equiv1 - base1
-    delta2 = equiv2 - base2
-    print(f"   {a1['symbol']} equivalent : {equiv1:,.{a1['balance_prec']}f} {a1['symbol']}  (Δ {delta1:+,.{a1['balance_prec']}f} | ${delta1*price1:+,.2f})")
-    print(f"   {a2['symbol']} equivalent : {equiv2:,.{a2['balance_prec']}f} {a2['symbol']}  (Δ {delta2:+,.{a2['balance_prec']}f} | ${delta2*price2:+,.2f})")
-
-    print("\n📈 Price Ratios:")
-    print(f"   1 {a1['symbol']} = {ratio_1_to_2:,.{a2['balance_prec']}f} {a2['symbol']}")
-    print(f"   1 {a2['symbol']} = {ratio_2_to_1:.14e} {a1['symbol']}")
-
-    print("\n💰 Current Prices:")
-    print(f"   {a1['symbol']} ≈ ${price1:,.{a1['price_prec']}f}")
-    print(f"   {a2['symbol']}  = ${price2:,.{a2['price_prec']}f}")
-
-    # ====================== CSV WRITING (PEPE = 4 decimals in CSV) ======================
+    # ====================== CSV WRITING (moved here so cumulative updates immediately) ======================
     if save_to_csv:
+        a1 = portfolio["asset1"]
+        a2 = portfolio["asset2"]
+
         prev_col1 = f"{a1['col_prefix']}_balance"
         prev_col2 = f"{a2['col_prefix']}_balance"
         prev1, prev2 = get_previous_balances(portfolio["csv_filename"], prev_col1, prev_col2)
@@ -306,7 +273,9 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
         change_usd1 = change1 * price1
         change_usd2 = change2 * price2
 
-        base1, base2 = get_first_equivalents(portfolio["csv_filename"], f"{a1['col_prefix']}_equivalent", f"{a2['col_prefix']}_equivalent")
+        base_col1 = f"{a1['col_prefix']}_equivalent"
+        base_col2 = f"{a2['col_prefix']}_equivalent"
+        base1, base2 = get_first_equivalents(portfolio["csv_filename"], base_col1, base_col2)
         delta1 = equiv1 - base1
         delta2 = equiv2 - base2
 
@@ -349,7 +318,45 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
             else:
                 print(f"✅ Appended new row to: {portfolio['csv_filename']}")
             writer.writerow(row)
-    else:
+
+    # ====================== DISPLAY SECTION (now sees the freshly written CSV) ======================
+    print("\n📊 Current Balances:")
+    a1 = portfolio["asset1"]
+    a2 = portfolio["asset2"]
+    print(f"   {a1['symbol']:4} : {bal1:,.{a1['balance_prec']}f} {a1['symbol']} (${val1:,.2f})")
+    print(f"   {a2['symbol']:4} : {bal2:,.{a2['balance_prec']}f} {a2['symbol']} (${val2:,.2f})")
+    print(f"   TOTAL : ${total_usd:,.2f}")
+
+    print_portfolio_bar(a1["symbol"], a2["symbol"], ratio1, bal1, bal2, price1, price2,
+                        portfolio["bar_char1"], portfolio["bar_char2"])
+
+    # Cumulative negative changes (now includes the row we just wrote)
+    chg_col1 = f"{a1['col_prefix']}_balance_change_usd"
+    chg_col2 = f"{a2['col_prefix']}_balance_change_usd"
+    neg1, neg2 = get_cumulative_negative_changes(portfolio["csv_filename"], chg_col1, chg_col2)
+    print("\n📉 Cumulative Negative USD Changes:")
+    print(f"   {a1['symbol']:4} : ${neg1:,.2f}      |      {a2['symbol']:4} : ${neg2:,.2f}")
+    print(f"   Difference : ${abs(neg2 - neg1):.2f}")
+
+    # Equivalents with baseline
+    print("\n🔄 Hypothetical Equivalents (USD base):")
+    base_col1 = f"{a1['col_prefix']}_equivalent"
+    base_col2 = f"{a2['col_prefix']}_equivalent"
+    base1, base2 = get_first_equivalents(portfolio["csv_filename"], base_col1, base_col2)
+    delta1 = equiv1 - base1
+    delta2 = equiv2 - base2
+    print(f"   {a1['symbol']} equivalent : {equiv1:,.{a1['balance_prec']}f} {a1['symbol']}  (Δ {delta1:+,.{a1['balance_prec']}f} | ${delta1*price1:+,.2f})")
+    print(f"   {a2['symbol']} equivalent : {equiv2:,.{a2['balance_prec']}f} {a2['symbol']}  (Δ {delta2:+,.{a2['balance_prec']}f} | ${delta2*price2:+,.2f})")
+
+    print("\n📈 Price Ratios:")
+    print(f"   1 {a1['symbol']} = {ratio_1_to_2:,.{a2['balance_prec']}f} {a2['symbol']}")
+    print(f"   1 {a2['symbol']} = {ratio_2_to_1:.14e} {a1['symbol']}")
+
+    print("\n💰 Current Prices:")
+    print(f"   {a1['symbol']} ≈ ${price1:,.{a1['price_prec']}f}")
+    print(f"   {a2['symbol']}  = ${price2:,.{a2['price_prec']}f}")
+
+    if not save_to_csv:
         print("CSV skipped (automatic refresh)")
 
     return now_kst
