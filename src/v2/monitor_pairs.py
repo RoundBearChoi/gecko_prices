@@ -120,6 +120,7 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def countdown(refresh_interval: int) -> bool:
+    print('')
     for remaining in range(refresh_interval, 0, -1):
         print(f"Next refresh in {remaining:2d}s... (press r then Enter to refresh now, Ctrl+C to stop)", end="\r")
         sys.stdout.flush()
@@ -329,7 +330,7 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print_portfolio_bar(a1["symbol"], a2["symbol"], ratio1, bal1, bal2, price1, price2,
                         portfolio["bar_char1"], portfolio["bar_char2"])
 
-    # ====================== CUMULATIVE NEGATIVE USD CHANGES + VISUAL BAR ======================
+    # ====================== CUMULATIVE NEGATIVE USD CHANGES + VISUAL BAR + SKEW % ======================
     chg_col1 = f"{a1['col_prefix']}_balance_change_usd"
     chg_col2 = f"{a2['col_prefix']}_balance_change_usd"
     neg1, neg2 = get_cumulative_negative_changes(portfolio["csv_filename"], chg_col1, chg_col2)
@@ -359,6 +360,13 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
 
     print(f"   Balance Ratio ({a1['symbol']}/{a2['symbol']}): {balance_ratio}{note}")
 
+    # ====================== SKEW PERCENTAGE (with emoji for emphasis) ======================
+    if total_loss > 1:
+        loss_ratio1 = abs_neg1 / total_loss
+        skew_pct = abs(loss_ratio1 * 100 - 50)
+        skew_towards = a1['symbol'] if loss_ratio1 > 0.5 else a2['symbol']
+        print(f"   ⚖️ Skew: {skew_pct:.1f}% towards {skew_towards}")
+
     # ====================== VISUAL LOSS DISTRIBUTION BAR ======================
     if total_loss > 1:  # avoid tiny-noise bars
         loss_ratio1 = abs_neg1 / total_loss
@@ -379,6 +387,9 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
         print(f"   {label1}{' ' * spacing}{label2}")
         if BASE_CONFIG["SHOW_50_PERCENT_MARKER"]:
             print(f"   {'50% ideal balance':^{w}}")
+        print(f"   Total cumulative loss: ${total_loss:,.2f}")
+    else:
+        print("\n📊 Cumulative Loss Distribution: (No significant losses recorded yet)")
 
     # ====================== REMAINING DISPLAY ======================
     # Equivalents with baseline
@@ -391,14 +402,9 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print(f"   {a1['symbol']} equivalent : {equiv1:,.{a1['balance_prec']}f} {a1['symbol']}  (Δ {delta1:+,.{a1['balance_prec']}f} | ${delta1*price1:+,.2f})")
     print(f"   {a2['symbol']} equivalent : {equiv2:,.{a2['balance_prec']}f} {a2['symbol']}  (Δ {delta2:+,.{a2['balance_prec']}f} | ${delta2*price2:+,.2f})")
 
-    print("\n📈 Price Ratios:")
-    print(f"   1 {a1['symbol']} = {ratio_1_to_2:,.{a2['balance_prec']}f} {a2['symbol']}")
-    print(f"   1 {a2['symbol']} = {ratio_2_to_1:.14e} {a1['symbol']}")
-
     print("\n💰 Current Prices:")
     print(f"   {a1['symbol']} ≈ ${price1:,.{a1['price_prec']}f}")
     print(f"   {a2['symbol']}  = ${price2:,.{a2['price_prec']}f}")
-    print('')
 
     if not save_to_csv:
         print("CSV skipped (automatic refresh)")
