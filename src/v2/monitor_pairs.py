@@ -302,6 +302,19 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     equiv1 = bal1 + (val2 / price1) if price1 > 0 else bal1
     equiv2 = bal2 + (val1 / price2) if price2 > 0 else bal2
 
+    # ===================================================================
+    # CROSS-PRICE RATIOS (CSV ONLY)
+    # These are the values you wanted kept in the CSV (orca_per_sol, pepe_per_btcb, etc.)
+    # even though they were removed from console output.
+    # Calculated purely from current CoinGecko prices.
+    # ===================================================================
+    if price1 > 0 and price2 > 0:
+        ratio_asset2_per_asset1 = price1 / price2   # e.g. ORCA per 1 SOL, PEPE per 1 BTCB
+        ratio_asset1_per_asset2 = price2 / price1   # e.g. SOL per 1 ORCA, BTCB per 1 PEPE
+    else:
+        ratio_asset2_per_asset1 = 0.0
+        ratio_asset1_per_asset2 = 0.0
+
     # ====================== CSV WRITING ======================
     if save_to_csv:
         a1 = portfolio["asset1"]
@@ -344,8 +357,9 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
             f"{a2['col_prefix']}_equivalent_change": round(delta2, pepe_csv_round),
             f"{a1['col_prefix']}_equivalent_change_usd": round(delta1 * price1, 2),
             f"{a2['col_prefix']}_equivalent_change_usd": round(delta2 * price2, 2),
-            f"{a2['col_prefix']}_per_{a1['col_prefix']}": round(ratio_1_to_2, 6) if 'ratio_1_to_2' in locals() else 0,
-            f"{a1['col_prefix']}_per_{a2['col_prefix']}": round(ratio_2_to_1, 15) if 'ratio_2_to_1' in locals() else 0,
+            # === FIXED CROSS-RATIO COLUMNS (CSV ONLY) ===
+            f"{a2['col_prefix']}_per_{a1['col_prefix']}": round(ratio_asset2_per_asset1, 6),
+            f"{a1['col_prefix']}_per_{a2['col_prefix']}": round(ratio_asset1_per_asset2, 15),
             f"portfolio_{a1['col_prefix']}_ratio": round(ratio1, 6),
             f"portfolio_{a2['col_prefix']}_ratio": round(1 - ratio1, 6),
         }
