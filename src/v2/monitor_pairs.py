@@ -120,6 +120,7 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def countdown(refresh_interval: int) -> bool:
+    print('')
     for remaining in range(refresh_interval, 0, -1):
         print(f"Next refresh in {remaining:2d}s... (press r then Enter to refresh now, Ctrl+C to stop)", end="\r")
         sys.stdout.flush()
@@ -383,7 +384,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
         print(f"   {label1}{' ' * spacing}{label2}")
         if BASE_CONFIG["SHOW_50_PERCENT_MARKER"]:
             print(f"   {'50% ideal balance':^{w}}")
-        print(f"   Total cumulative loss: ${total_loss:,.2f}")
     else:
         print("\n📊 Cumulative Loss Distribution: (No significant losses recorded yet)")
 
