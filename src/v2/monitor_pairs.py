@@ -99,6 +99,46 @@ def get_cumulative_negative_changes(csv_filename: str, chg_col1: str, chg_col2: 
     except Exception:
         return 0.0, 0.0
 
+def get_start_info(csv_filename: str, current_kst: datetime) -> tuple[str, str]:
+    """Return (readable_start_date, elapsed_str) with days (2 decimals) + hours in parentheses.
+    Used for the new 'Started' header line."""
+    if not os.path.isfile(csv_filename):
+        return "Not started yet (first run)", "0.00 days (0 hours)"
+
+    try:
+        with open(csv_filename, "r", newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+            if not rows:
+                return "Not started yet (first run)", "0.00 days (0 hours)"
+
+            first = rows[0]
+            # Prefer human-readable KST date for display
+            start_str = first.get("readable_time_kst") or first.get("timestamp_kst", "Unknown date")
+
+            # Parse the ISO timestamp for accurate elapsed calculation
+            start_iso = first.get("timestamp_kst")
+            if not start_iso:
+                return start_str, "N/A"
+
+            try:
+                # Handle both naive and aware ISO strings safely
+                start_dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=current_kst.tzinfo)
+            except Exception:
+                return start_str, "N/A (parse error)"
+
+            # Calculate elapsed time (timezone-aware)
+            delta = current_kst - start_dt
+            days_elapsed = delta.total_seconds() / 86400          # 24*60*60
+            hours_elapsed = delta.total_seconds() / 3600
+
+            elapsed_str = f"{days_elapsed:.2f} days ({hours_elapsed:.0f} hours)"
+            return start_str, elapsed_str
+
+    except Exception:
+        return "N/A (error reading CSV)", "N/A"
+
 def get_prices(cg_ids: str) -> Dict[str, float]:
     url = f"https://api.coingecko.com/api/v3/simple/price?ids={cg_ids}&vs_currencies=usd&precision=full"
     wait = BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"]
@@ -234,6 +274,11 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print(f"🔴 {portfolio['name']} Portfolio Monitor")
     print("=" * 90)
     print(f"Wallet  : {address}")
+
+    # NEW: Started line with original date + days elapsed (2 decimals) + hours in parentheses
+    start_date, elapsed = get_start_info(portfolio["csv_filename"], now_kst)
+    print(f"Started : {start_date} (KST)   [{elapsed}]")
+
     print(f"Updated : {timestamp_str} (KST)")
     print("=" * 90)
 
