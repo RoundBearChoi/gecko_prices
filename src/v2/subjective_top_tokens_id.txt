@@ -15,3 +15,4 @@ pancakeswap-token
 pudgy-penguins
 gigachad-2
 raydium
+orca

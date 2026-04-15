@@ -7,8 +7,8 @@ from pandas.tseries.offsets import DateOffset
 
 # ==================== CONFIG SECTION ====================
 # Default values (used when you run the script with no arguments)
-TOKEN1 = 'eth'      # numerator  (top of the ratio)
-TOKEN0 = 'btc'      # denominator (bottom of the ratio)
+TOKEN1 = 'orca'      # numerator  (top of the ratio)
+TOKEN0 = 'sol'      # denominator (bottom of the ratio)
 N_MONTHS = 24       # how many months back from the latest data point
 # =======================================================
 
