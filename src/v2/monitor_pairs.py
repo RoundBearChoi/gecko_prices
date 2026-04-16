@@ -469,7 +469,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
 
     # vs Absolute Baseline (JSON)
     absolute_starts = load_absolute_starts()
-    print(f"   vs Absolute Baseline (JSON) →")
     for asset, current_equiv, current_price in [(a1, equiv1, price1), (a2, equiv2, price2)]:
         prefix = asset["col_prefix"]
         base_data = absolute_starts.get(prefix, {})
@@ -478,9 +477,9 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
             base_date = base_data.get("date_kst", "Unknown date")
             delta_abs = current_equiv - base_equiv
             delta_usd = delta_abs * current_price
-            print(f"      {asset['symbol']} equivalent : {current_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
-            print(f"         Base : {base_equiv:,.{asset['balance_prec']}f} on {base_date}")
-            print(f"         Δ    : {delta_abs:+,.{asset['balance_prec']}f} | ${delta_usd:+,.2f}")
+            print(f"   {asset['symbol']} equivalent : {current_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
+            print(f"   Base : {base_equiv:,.{asset['balance_prec']}f} on {base_date}")
+            print(f"   Δ    : {delta_abs:+,.{asset['balance_prec']}f} | ${delta_usd:+,.2f}")
         else:
             print(f"      {asset['symbol']}: No absolute baseline set in {ABSOLUTE_STARTS_FILE}")
 
