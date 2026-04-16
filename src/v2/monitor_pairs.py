@@ -6,7 +6,7 @@ import zoneinfo
 import time
 import sys
 import select
-from typing import Dict, Any, Tuple
+from typing import Dict, Tuple
 from web3 import Web3
 
 # ========================= BASE CONFIG =========================
@@ -20,6 +20,13 @@ BASE_CONFIG = {
     "REFRESH_INTERVAL": 60 * 5,
     "UPDATE_ONCE": False,
     "RATE_LIMIT_WAIT_SECONDS": 60 * 2,
+    "PRICE_CACHE_SECONDS": 10,
+}
+
+# ====================== GLOBAL PRICE CACHE ======================
+PRICE_CACHE: Dict = {
+    "prices": None,
+    "timestamp": 0.0,
 }
 
 # ========================= PORTFOLIOS CONFIGS =========================
@@ -100,12 +107,9 @@ def get_cumulative_negative_changes(csv_filename: str, chg_col1: str, chg_col2: 
     except Exception:
         return 0.0, 0.0
 
-# ====================== NEW HELPER: MINUTES SINCE LAST BALANCE CHANGE ======================
 def get_minutes_since_last_balance_change(csv_filename: str, chg_col1: str, chg_col2: str) -> str:
-    """Returns human-readable string showing minutes since the last non-zero balance change (deposit/withdrawal/swap)."""
     if not os.path.isfile(csv_filename):
         return "No CSV yet"
-
     try:
         with open(csv_filename, "r", newline="", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
@@ -115,12 +119,11 @@ def get_minutes_since_last_balance_change(csv_filename: str, chg_col1: str, chg_
             kst_tz = zoneinfo.ZoneInfo(BASE_CONFIG["KST_TIMEZONE"])
             now_kst = datetime.now(kst_tz)
 
-            # Scan backwards from newest row
             for row in reversed(rows):
                 try:
                     chg1 = float(row.get(chg_col1, 0) or 0)
                     chg2 = float(row.get(chg_col2, 0) or 0)
-                    if abs(chg1) > 1e-9 or abs(chg2) > 1e-9:  # tolerance for float precision
+                    if abs(chg1) > 1e-9 or abs(chg2) > 1e-9:
                         ts_str = row["timestamp_kst"]
                         last_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                         if last_dt.tzinfo is None:
@@ -129,59 +132,59 @@ def get_minutes_since_last_balance_change(csv_filename: str, chg_col1: str, chg_
                         return f"{delta_min:.1f} minutes ago"
                 except (ValueError, TypeError, KeyError):
                     continue
-
         return "No balance changes in history"
     except Exception:
         return "Error checking history"
 
 def get_start_info(csv_filename: str, current_kst: datetime) -> tuple[str, str]:
-    """Return (readable_start_date, elapsed_str) with days (2 decimals) + hours in parentheses."""
     if not os.path.isfile(csv_filename):
         return "Not started yet (first run)", "0.00 days (0 hours)"
-
     try:
         with open(csv_filename, "r", newline="", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
             if not rows:
                 return "Not started yet (first run)", "0.00 days (0 hours)"
-
             first = rows[0]
             start_str = first.get("readable_time_kst") or first.get("timestamp_kst", "Unknown date")
-
             start_iso = first.get("timestamp_kst")
             if not start_iso:
                 return start_str, "N/A"
-
             try:
                 start_dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
                 if start_dt.tzinfo is None:
                     start_dt = start_dt.replace(tzinfo=current_kst.tzinfo)
             except Exception:
                 return start_str, "N/A (parse error)"
-
             delta = current_kst - start_dt
             days_elapsed = delta.total_seconds() / 86400
             hours_elapsed = delta.total_seconds() / 3600
-
             elapsed_str = f"{days_elapsed:.2f} days ({hours_elapsed:.0f} hours)"
             return start_str, elapsed_str
-
     except Exception:
         return "N/A (error reading CSV)", "N/A"
 
+# ====================== UPDATED: get_prices with caching ======================
 def get_prices(cg_ids: str) -> Dict[str, float]:
+    now = time.time()
+    cache_age = now - PRICE_CACHE["timestamp"]
+    if PRICE_CACHE["prices"] and cache_age < BASE_CONFIG["PRICE_CACHE_SECONDS"]:
+        print(f"   📦 Using cached prices (age: {cache_age:.0f}s)")
+        return PRICE_CACHE["prices"]
+
     url = f"https://api.coingecko.com/api/v3/simple/price?ids={cg_ids}&vs_currencies=usd&precision=full"
-    wait = BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"]
     for attempt in range(5):
         try:
             r = requests.get(url, timeout=15)
             r.raise_for_status()
             data = r.json()
-            return {k: v["usd"] for k, v in data.items()}
+            prices = {k: v["usd"] for k, v in data.items()}
+            # update cache
+            PRICE_CACHE["prices"] = prices
+            PRICE_CACHE["timestamp"] = time.time()
+            return prices
         except Exception as e:
             if _handle_rate_limit(str(e)) and attempt < 4:
-                print(f"⚠️  CoinGecko rate limit. Waiting {wait}s...")
-                time.sleep(wait)
+                wait_with_progress(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"], "CoinGecko rate limit")
                 continue
             raise
     raise Exception("Failed to fetch prices after retries")
@@ -189,9 +192,8 @@ def get_prices(cg_ids: str) -> Dict[str, float]:
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-# ====================== ENHANCED COUNTDOWN WITH PROGRESS BAR ======================
+# ====================== ENHANCED COUNTDOWN ======================
 def countdown(refresh_interval: int) -> bool:
-    """Enhanced countdown with visual progress bar (█/─ style, matching your portfolio bars)."""
     print('')
     start_time = time.time()
     total = refresh_interval
@@ -204,7 +206,6 @@ def countdown(refresh_interval: int) -> bool:
 
         remaining = max(0, int(total - elapsed))
         progress = min(1.0, elapsed / total)
-
         filled = int(round(progress * bar_width))
         bar = "█" * filled + "─" * (bar_width - filled)
 
@@ -228,6 +229,33 @@ def countdown(refresh_interval: int) -> bool:
     print(" " * 150, end="\r")
     return False
 
+# ====================== RATE LIMIT PROGRESS BAR ======================
+def wait_with_progress(wait_seconds: int, reason: str = "Rate limit"):
+    if wait_seconds <= 0:
+        return
+    print('')
+    start_time = time.time()
+    total = wait_seconds
+    bar_width = BASE_CONFIG["COUNTDOWN_BAR_WIDTH"]
+
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed >= total:
+            break
+
+        remaining = max(0, int(total - elapsed))
+        progress = min(1.0, elapsed / total)
+        filled = int(round(progress * bar_width))
+        bar = "█" * filled + "─" * (bar_width - filled)
+
+        msg = f"⚠️  {reason} - Waiting {remaining:3d}s  [{bar}]"
+        print(msg + " " * 40, end="\r")
+        sys.stdout.flush()
+        time.sleep(0.2)
+
+    print(" " * 180, end="\r")
+    print(f"✅ {reason} cooldown finished.")
+
 # ====================== BALANCE FETCHERS ======================
 def get_sol_balance(rpc_url: str, pubkey: str) -> float:
     payload = {"jsonrpc": "2.0", "id": 1, "method": "getBalance", "params": [pubkey]}
@@ -238,13 +266,13 @@ def get_sol_balance(rpc_url: str, pubkey: str) -> float:
             data = r.json()
             if "error" in data:
                 if _handle_rate_limit(str(data["error"])) and attempt < 4:
-                    time.sleep(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"])
+                    wait_with_progress(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"], "Solana RPC rate limit")
                     continue
                 raise Exception(str(data["error"]))
             return data["result"]["value"] / 1_000_000_000
         except Exception as e:
             if _handle_rate_limit(str(e)) and attempt < 4:
-                time.sleep(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"])
+                wait_with_progress(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"], "Solana RPC rate limit")
                 continue
             raise
     raise Exception("SOL balance fetch failed after retries")
@@ -260,7 +288,7 @@ def get_orca_balance(rpc_url: str, pubkey: str, orca_mint: str) -> float:
             r.raise_for_status()
             data = r.json()
             if "error" in data and _handle_rate_limit(str(data["error"])) and attempt < 4:
-                time.sleep(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"])
+                wait_with_progress(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"], "Solana RPC rate limit")
                 continue
             accounts = data.get("result", {}).get("value", [])
             if not accounts:
@@ -269,7 +297,7 @@ def get_orca_balance(rpc_url: str, pubkey: str, orca_mint: str) -> float:
             return int(info["amount"]) / (10 ** int(info["decimals"]))
         except Exception as e:
             if _handle_rate_limit(str(e)) and attempt < 4:
-                time.sleep(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"])
+                wait_with_progress(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"], "Solana RPC rate limit")
                 continue
             raise
     raise Exception("ORCA balance fetch failed after retries")
@@ -284,7 +312,7 @@ def get_erc20_balance(w3: Web3, address: str, token_contract: str) -> float:
     decimals = contract.functions.decimals().call()
     return raw / (10 ** decimals)
 
-# ====================== UPDATED PORTFOLIO BAR (no thousands separators in rebalance line) ======================
+# ====================== PORTFOLIO BAR ======================
 def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: float, bal1: float, bal2: float,
                         price1: float, price2: float, bar_char1: str, bar_char2: str):
     ratio2 = 1.0 - ratio1
@@ -434,13 +462,11 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print_portfolio_bar(a1["symbol"], a2["symbol"], ratio1, bal1, bal2, price1, price2,
                         portfolio["bar_char1"], portfolio["bar_char2"])
 
-    # ====================== NEW: LAST BALANCE CHANGE ======================
     chg_col1 = f"{a1['col_prefix']}_balance_change"
     chg_col2 = f"{a2['col_prefix']}_balance_change"
     last_change_info = get_minutes_since_last_balance_change(portfolio["csv_filename"], chg_col1, chg_col2)
     print(f"   Last balance change: {last_change_info}")
 
-    # ====================== CUMULATIVE NEGATIVE USD CHANGES ======================
     chg_col1 = f"{a1['col_prefix']}_balance_change_usd"
     chg_col2 = f"{a2['col_prefix']}_balance_change_usd"
     neg1, neg2 = get_cumulative_negative_changes(portfolio["csv_filename"], chg_col1, chg_col2)
