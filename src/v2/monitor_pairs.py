@@ -79,19 +79,6 @@ def get_previous_balances(csv_filename: str, col1: str, col2: str) -> Tuple[floa
     except Exception:
         return 0.0, 0.0
 
-def get_first_equivalents(csv_filename: str, col1: str, col2: str) -> Tuple[float, float]:
-    if not os.path.isfile(csv_filename):
-        return 0.0, 0.0
-    try:
-        with open(csv_filename, "r", newline="", encoding="utf-8") as f:
-            rows = list(csv.DictReader(f))
-            if not rows:
-                return 0.0, 0.0
-            first = rows[0]
-            return float(first.get(col1, 0)), float(first.get(col2, 0))
-    except Exception:
-        return 0.0, 0.0
-
 def get_minutes_since_last_balance_change(csv_filename: str, chg_col1: str, chg_col2: str) -> str:
     if not os.path.isfile(csv_filename):
         return "No CSV yet"
@@ -403,12 +390,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
         change_usd1 = change1 * price1
         change_usd2 = change2 * price2
 
-        base_col1 = f"{a1['col_prefix']}_equivalent"
-        base_col2 = f"{a2['col_prefix']}_equivalent"
-        base1, base2 = get_first_equivalents(portfolio["csv_filename"], base_col1, base_col2)
-        delta1 = equiv1 - base1
-        delta2 = equiv2 - base2
-
         pepe_csv_round = 4 if a2['symbol'] == "PEPE" else 9
 
         row = {
@@ -427,10 +408,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
             "total_value_usd": round(total_usd, 2),
             f"{a1['col_prefix']}_equivalent": round(equiv1, 9),
             f"{a2['col_prefix']}_equivalent": round(equiv2, pepe_csv_round),
-            f"{a1['col_prefix']}_equivalent_change": round(delta1, 9),
-            f"{a2['col_prefix']}_equivalent_change": round(delta2, pepe_csv_round),
-            f"{a1['col_prefix']}_equivalent_change_usd": round(delta1 * price1, 2),
-            f"{a2['col_prefix']}_equivalent_change_usd": round(delta2 * price2, 2),
             f"{a2['col_prefix']}_per_{a1['col_prefix']}": round(ratio_asset2_per_asset1, 6),
             f"{a1['col_prefix']}_per_{a2['col_prefix']}": round(ratio_asset1_per_asset2, 15),
             f"portfolio_{a1['col_prefix']}_ratio": round(ratio1, 6),
