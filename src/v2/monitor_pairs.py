@@ -13,7 +13,7 @@ from web3 import Web3
 BASE_CONFIG = {
     "KST_TIMEZONE": "Asia/Seoul",
     "BAR_WIDTH": 80,
-    "COUNTDOWN_BAR_WIDTH": 40,          # ← NEW: width of the countdown progress bar
+    "COUNTDOWN_BAR_WIDTH": 80,
     "SHOW_HEADER_LABELS": True,
     "SHOW_50_PERCENT_MARKER": True,
     "PERCENT_PRECISION": 1,
