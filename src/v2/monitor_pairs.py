@@ -12,7 +12,7 @@ import json
 from decimal import Decimal, getcontext
 
 # ========================= HIGH-PRECISION DECIMAL SETUP =========================
-getcontext().prec = 36  # More than enough for 18-decimal tokens + price precision
+getcontext().prec = 36
 
 # ========================= BASE CONFIG =========================
 BASE_CONFIG = {
@@ -48,7 +48,7 @@ PORTFOLIOS = {
         "bar_char1": "█",
         "bar_char2": "─",
         "orca_mint": "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE",
-        "absolute_key": "sol_orca",          # ← GROUPED baseline key
+        "absolute_key": "sol_orca",
     },
     "2": {  # BTCB + PEPE (BSC)
         "name": "PEPE + BTCB (BSC)",
@@ -56,17 +56,23 @@ PORTFOLIOS = {
         "rpc_url": "https://bsc-dataseed.binance.org/",
         "csv_filename": "btcb_pepe_balances.csv",
         "asset1": {"symbol": "BTCB",  "cg_id": "binance-bitcoin", "balance_prec": 6, "price_prec": 2, "col_prefix": "btcb"},
-        "asset2": {"symbol": "PEPE",  "cg_id": "pepe",            
-                   "balance_prec": 8,      
-                   "price_prec": 18, 
-                   "col_prefix": "pepe"},
+        "asset2": {"symbol": "PEPE",  "cg_id": "pepe", "balance_prec": 8, "price_prec": 18, "col_prefix": "pepe"},
         "bar_char1": "█",
         "bar_char2": "─",
         "btcb_contract": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
         "pepe_contract": "0x25d887ce7a35172c62febfd67a1856f20faebb00",
-        "absolute_key": "btcb_pepe",         # ← GROUPED baseline key
+        "absolute_key": "btcb_pepe",
     }
 }
+
+# ====================== HIGH-PRECISION CSV HELPER ======================
+def decimal_to_csv_str(value: Decimal, decimals: int = 18) -> str:
+    """Convert Decimal → fixed-point string for CSV. ZERO float() usage → full precision preserved."""
+    if value.is_zero():
+        return '0'
+    quantizer = Decimal('1e-' + str(decimals))
+    quantized = value.quantize(quantizer)
+    return f"{quantized:f}"   # always clean fixed-point, no scientific notation
 
 # ====================== COMMON HELPERS ======================
 def _handle_rate_limit(error_msg: str = "") -> bool:
@@ -247,7 +253,7 @@ def wait_with_progress(wait_seconds: int, reason: str = "Rate limit"):
     print(" " * 180, end="\r")
     print(f"✅ {reason} cooldown finished.")
 
-# ====================== BALANCE FETCHERS (now return Decimal) ======================
+# ====================== BALANCE FETCHERS ======================
 def get_sol_balance(rpc_url: str, pubkey: str) -> Decimal:
     payload = {"jsonrpc": "2.0", "id": 1, "method": "getBalance", "params": [pubkey]}
     for attempt in range(5):
@@ -269,6 +275,7 @@ def get_sol_balance(rpc_url: str, pubkey: str) -> Decimal:
     raise Exception("SOL balance fetch failed after retries")
 
 def get_orca_balance(rpc_url: str, pubkey: str, orca_mint: str) -> Decimal:
+    """Now correctly sums ALL token accounts for the mint (critical fix)."""
     payload = {
         "jsonrpc": "2.0", "id": 1, "method": "getTokenAccountsByOwner",
         "params": [pubkey, {"mint": orca_mint}, {"encoding": "jsonParsed"}]
@@ -282,10 +289,15 @@ def get_orca_balance(rpc_url: str, pubkey: str, orca_mint: str) -> Decimal:
                 wait_with_progress(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"], "Solana RPC rate limit")
                 continue
             accounts = data.get("result", {}).get("value", [])
-            if not accounts:
-                return Decimal('0')
-            info = accounts[0]["account"]["data"]["parsed"]["info"]["tokenAmount"]
-            return Decimal(info["amount"]) / Decimal(10 ** int(info["decimals"]))
+            total = Decimal('0')
+            for acc in accounts:
+                try:
+                    info = acc["account"]["data"]["parsed"]["info"]["tokenAmount"]
+                    amount = Decimal(info["amount"]) / Decimal(10 ** int(info["decimals"]))
+                    total += amount
+                except (KeyError, TypeError, ValueError):
+                    continue
+            return total
         except Exception as e:
             if _handle_rate_limit(str(e)) and attempt < 4:
                 wait_with_progress(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"], "Solana RPC rate limit")
@@ -303,12 +315,12 @@ def get_erc20_balance(w3: Web3, address: str, token_contract: str) -> Decimal:
     decimals = contract.functions.decimals().call()
     return Decimal(raw) / Decimal(10 ** decimals)
 
-# ====================== PORTFOLIO BAR (updated for Decimal) ======================
+# ====================== PORTFOLIO BAR (now fully Decimal) ======================
 def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: Decimal, bal1: Decimal, bal2: Decimal,
                         price1: Decimal, price2: Decimal, bar_char1: str, bar_char2: str):
     ratio2 = Decimal('1') - ratio1
     w = BASE_CONFIG["BAR_WIDTH"]
-    blocks1 = int(round(float(ratio1) * w))
+    blocks1 = int(round(float(ratio1) * w))  # visual only — no accuracy impact
     bar = bar_char1 * blocks1 + bar_char2 * (w - blocks1)
 
     prec = BASE_CONFIG["PERCENT_PRECISION"]
@@ -325,18 +337,18 @@ def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: Decimal, bal1:
     if BASE_CONFIG["SHOW_50_PERCENT_MARKER"]:
         print(f"   {'50%':^{w}}")
 
-    total_usd = float(bal1 * price1 + bal2 * price2)
-    if total_usd > 1.0:
+    total_usd = bal1 * price1 + bal2 * price2
+    if total_usd > 1:
         target = total_usd / 2
-        excess = float(bal1 * price1) - target
+        excess = (bal1 * price1) - target
         if excess >= 0:
-            sell1 = excess / float(price1)
-            buy2 = excess / float(price2)
-            print(f"   To 50:50 → Sell ~{sell1:.6f} {asset1_sym} (~${excess:.2f} USD) to buy ~{buy2:.4f} {asset2_sym}")
+            sell1 = excess / price1
+            buy2 = excess / price2
+            print(f"   To 50:50 → Sell ~{sell1:.6f} {asset1_sym} (~${float(excess):.2f} USD) to buy ~{buy2:.4f} {asset2_sym}")
         else:
-            sell2 = abs(excess) / float(price2)
-            buy1 = abs(excess) / float(price1)
-            print(f"   To 50:50 → Sell ~{sell2:.4f} {asset2_sym} (~${abs(excess):.2f} USD) to buy ~{buy1:.6f} {asset1_sym}")
+            sell2 = abs(excess) / price2
+            buy1 = abs(excess) / price1
+            print(f"   To 50:50 → Sell ~{sell2:.4f} {asset2_sym} (~${float(abs(excess)):.2f} USD) to buy ~{buy1:.6f} {asset1_sym}")
     else:
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
 
@@ -356,7 +368,7 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print(f"Updated : {timestamp_str} (KST)")
     print("=" * 90)
 
-    # Fetch balances (now Decimal)
+    # Fetch balances (Decimal)
     if portfolio["chain"] == "solana":
         bal1 = get_sol_balance(portfolio["rpc_url"], address)
         bal2 = get_orca_balance(portfolio["rpc_url"], address, portfolio["orca_mint"])
@@ -368,7 +380,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     price1 = prices[portfolio["asset1"]["cg_id"]]
     price2 = prices[portfolio["asset2"]["cg_id"]]
 
-    # All math now exact with Decimal
     val1 = bal1 * price1
     val2 = bal2 * price2
     total_usd = val1 + val2
@@ -377,23 +388,12 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     equiv1 = bal1 + (val2 / price1) if price1 > 0 else bal1
     equiv2 = bal2 + (val1 / price2) if price2 > 0 else bal2
 
-    if price1 > 0 and price2 > 0:
-        ratio_asset2_per_asset1 = price1 / price2
-        ratio_asset1_per_asset2 = price2 / price1
-    else:
-        ratio_asset2_per_asset1 = Decimal('0')
-        ratio_asset1_per_asset2 = Decimal('0')
+    ratio_asset2_per_asset1 = price1 / price2 if price1 > 0 and price2 > 0 else Decimal('0')
+    ratio_asset1_per_asset2 = price2 / price1 if price1 > 0 and price2 > 0 else Decimal('0')
 
-    # ====================== CSV WRITING (higher PEPE precision) ======================
+    # ====================== CSV WRITING (FULL PRECISION) ======================
     a1 = portfolio["asset1"]
     a2 = portfolio["asset2"]
-
-    if a2['symbol'] == "PEPE":
-        csv_balance_prec = 10
-        csv_equiv_prec   = 8
-    else:
-        csv_balance_prec = 9
-        csv_equiv_prec   = 9
 
     if save_to_csv:
         prev_col1 = f"{a1['col_prefix']}_balance"
@@ -408,23 +408,23 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
         row = {
             "timestamp_kst": now_kst.isoformat(),
             "readable_time_kst": timestamp_str,
-            f"{a1['col_prefix']}_balance": round(float(bal1), 9),
-            f"{a1['col_prefix']}_balance_change": round(float(change1), 9),
-            f"{a1['col_prefix']}_balance_change_usd": round(float(change_usd1), 2),
-            f"{a2['col_prefix']}_balance": round(float(bal2), csv_balance_prec),
-            f"{a2['col_prefix']}_balance_change": round(float(change2), csv_balance_prec),
-            f"{a2['col_prefix']}_balance_change_usd": round(float(change_usd2), 2),
-            f"{a1['col_prefix']}_price_usd": round(float(price1), 6),
-            f"{a2['col_prefix']}_price_usd": round(float(price2), 18 if a2['symbol'] == "PEPE" else 6),
-            f"{a1['col_prefix']}_value_usd": round(float(val1), 2),
-            f"{a2['col_prefix']}_value_usd": round(float(val2), 2),
-            "total_value_usd": round(float(total_usd), 2),
-            f"{a1['col_prefix']}_equivalent": round(float(equiv1), 9),
-            f"{a2['col_prefix']}_equivalent": round(float(equiv2), csv_equiv_prec),
-            f"{a2['col_prefix']}_per_{a1['col_prefix']}": round(float(ratio_asset2_per_asset1), 6),
-            f"{a1['col_prefix']}_per_{a2['col_prefix']}": round(float(ratio_asset1_per_asset2), 15),
-            f"portfolio_{a1['col_prefix']}_ratio": round(float(ratio1), 6),
-            f"portfolio_{a2['col_prefix']}_ratio": round(float(Decimal('1') - ratio1), 6),
+            f"{a1['col_prefix']}_balance": decimal_to_csv_str(bal1, 18),
+            f"{a1['col_prefix']}_balance_change": decimal_to_csv_str(change1, 18),
+            f"{a1['col_prefix']}_balance_change_usd": decimal_to_csv_str(change_usd1, 2),
+            f"{a2['col_prefix']}_balance": decimal_to_csv_str(bal2, 18),
+            f"{a2['col_prefix']}_balance_change": decimal_to_csv_str(change2, 18),
+            f"{a2['col_prefix']}_balance_change_usd": decimal_to_csv_str(change_usd2, 2),
+            f"{a1['col_prefix']}_price_usd": decimal_to_csv_str(price1, 12),
+            f"{a2['col_prefix']}_price_usd": decimal_to_csv_str(price2, 24 if a2['symbol'] == "PEPE" else 12),
+            f"{a1['col_prefix']}_value_usd": decimal_to_csv_str(val1, 2),
+            f"{a2['col_prefix']}_value_usd": decimal_to_csv_str(val2, 2),
+            "total_value_usd": decimal_to_csv_str(total_usd, 2),
+            f"{a1['col_prefix']}_equivalent": decimal_to_csv_str(equiv1, 18),
+            f"{a2['col_prefix']}_equivalent": decimal_to_csv_str(equiv2, 18),
+            f"{a2['col_prefix']}_per_{a1['col_prefix']}": decimal_to_csv_str(ratio_asset2_per_asset1, 24),
+            f"{a1['col_prefix']}_per_{a2['col_prefix']}": decimal_to_csv_str(ratio_asset1_per_asset2, 24),
+            f"portfolio_{a1['col_prefix']}_ratio": decimal_to_csv_str(ratio1, 18),
+            f"portfolio_{a2['col_prefix']}_ratio": decimal_to_csv_str(Decimal('1') - ratio1, 18),
         }
 
         fieldnames = list(row.keys())
@@ -452,7 +452,7 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     last_change_info = get_minutes_since_last_balance_change(portfolio["csv_filename"], chg_col1, chg_col2)
     print(f"   Last balance change: {last_change_info}")
 
-    # ====================== HYPOTHETICAL EQUIVALENTS (with TOTAL USD) ======================
+    # ====================== HYPOTHETICAL EQUIVALENTS ======================
     print("\n🔄 Hypothetical Equivalents (USD base):")
     absolute_starts = load_absolute_starts()
     pair_key = portfolio.get("absolute_key")
@@ -462,39 +462,28 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
         base_date = pair_data["date_kst"]
         print(f"   Baseline date : {base_date} (KST)")
 
-        # Per-asset equivalents
         for asset, current_equiv, current_price in [(a1, equiv1, price1), (a2, equiv2, price2)]:
             prefix = asset["col_prefix"]
             if prefix in pair_data:
                 base_equiv = Decimal(str(pair_data[prefix]))
                 delta_abs = current_equiv - base_equiv
                 delta_usd = delta_abs * current_price
-
                 print(f"   {asset['symbol']} equivalent : {current_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
                 print(f"   Base          : {base_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
                 print(f"   Δ             : {delta_abs:+,.{asset['balance_prec']}f} | ${float(delta_usd):+,.2f}")
             else:
                 print(f"      {asset['symbol']}: No baseline found under pair key '{pair_key}'")
 
-        # NEW: Total USD comparison
         if "total_usd" in pair_data:
             base_total = Decimal(str(pair_data["total_usd"]))
             delta_total_usd = total_usd - base_total
-            if base_total > 0:
-                delta_pct = (delta_total_usd / base_total) * Decimal('100')
-                pct_str = f" ({float(delta_pct):+.2f}%)"
-            else:
-                pct_str = ""
-
-            print("\n 📈 Total Portfolio (USD):")   # ← Updated emoji here
+            pct_str = f" ({float((delta_total_usd / base_total)*100):+.2f}%)" if base_total > 0 else ""
+            print("\n📈 Total Portfolio (USD):")
             print(f"   Current    : ${float(total_usd):,.2f}")
             print(f"   Baseline   : ${float(base_total):,.2f}")
             print(f"   Change     : ${float(delta_total_usd):+,.2f}{pct_str}")
-        else:
-            print("\n   💡 Tip: Add \"total_usd\": <value> to this pair in absolute_starts.json for total value tracking.")
     else:
         print(f"   No absolute baseline set for this pair ('{pair_key}') in {ABSOLUTE_STARTS_FILE}")
-        print("      (Create/replace the file with the new grouped structure including 'total_usd')")
 
     print("\n💰 Current Prices:")
     print(f"   {a1['symbol']} = ${float(price1):,.{a1['price_prec']}f}")
