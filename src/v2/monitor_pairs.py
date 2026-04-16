@@ -100,9 +100,42 @@ def get_cumulative_negative_changes(csv_filename: str, chg_col1: str, chg_col2: 
     except Exception:
         return 0.0, 0.0
 
+# ====================== NEW HELPER: MINUTES SINCE LAST BALANCE CHANGE ======================
+def get_minutes_since_last_balance_change(csv_filename: str, chg_col1: str, chg_col2: str) -> str:
+    """Returns human-readable string showing minutes since the last non-zero balance change (deposit/withdrawal/swap)."""
+    if not os.path.isfile(csv_filename):
+        return "No CSV yet"
+
+    try:
+        with open(csv_filename, "r", newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+            if len(rows) <= 1:
+                return "No previous change recorded"
+
+            kst_tz = zoneinfo.ZoneInfo(BASE_CONFIG["KST_TIMEZONE"])
+            now_kst = datetime.now(kst_tz)
+
+            # Scan backwards from newest row
+            for row in reversed(rows):
+                try:
+                    chg1 = float(row.get(chg_col1, 0) or 0)
+                    chg2 = float(row.get(chg_col2, 0) or 0)
+                    if abs(chg1) > 1e-9 or abs(chg2) > 1e-9:  # tolerance for float precision
+                        ts_str = row["timestamp_kst"]
+                        last_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        if last_dt.tzinfo is None:
+                            last_dt = last_dt.replace(tzinfo=kst_tz)
+                        delta_min = (now_kst - last_dt).total_seconds() / 60
+                        return f"{delta_min:.1f} minutes ago"
+                except (ValueError, TypeError, KeyError):
+                    continue
+
+        return "No balance changes in history"
+    except Exception:
+        return "Error checking history"
+
 def get_start_info(csv_filename: str, current_kst: datetime) -> tuple[str, str]:
-    """Return (readable_start_date, elapsed_str) with days (2 decimals) + hours in parentheses.
-    Used for the new 'Started' header line."""
+    """Return (readable_start_date, elapsed_str) with days (2 decimals) + hours in parentheses."""
     if not os.path.isfile(csv_filename):
         return "Not started yet (first run)", "0.00 days (0 hours)"
 
@@ -113,25 +146,21 @@ def get_start_info(csv_filename: str, current_kst: datetime) -> tuple[str, str]:
                 return "Not started yet (first run)", "0.00 days (0 hours)"
 
             first = rows[0]
-            # Prefer human-readable KST date for display
             start_str = first.get("readable_time_kst") or first.get("timestamp_kst", "Unknown date")
 
-            # Parse the ISO timestamp for accurate elapsed calculation
             start_iso = first.get("timestamp_kst")
             if not start_iso:
                 return start_str, "N/A"
 
             try:
-                # Handle both naive and aware ISO strings safely
                 start_dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
                 if start_dt.tzinfo is None:
                     start_dt = start_dt.replace(tzinfo=current_kst.tzinfo)
             except Exception:
                 return start_str, "N/A (parse error)"
 
-            # Calculate elapsed time (timezone-aware)
             delta = current_kst - start_dt
-            days_elapsed = delta.total_seconds() / 86400          # 24*60*60
+            days_elapsed = delta.total_seconds() / 86400
             hours_elapsed = delta.total_seconds() / 3600
 
             elapsed_str = f"{days_elapsed:.2f} days ({hours_elapsed:.0f} hours)"
@@ -162,11 +191,7 @@ def clear_screen():
 
 # ====================== ENHANCED COUNTDOWN WITH PROGRESS BAR ======================
 def countdown(refresh_interval: int) -> bool:
-    """Enhanced countdown with visual progress bar (█/─ style, matching your portfolio bars).
-    - Progress bar fills as time passes toward the next refresh.
-    - Real-time update every second using time.time() for precision.
-    - Still fully supports manual 'r' + Enter refresh and Ctrl+C.
-    - Clean line overwrite + final cleanup to prevent visual artifacts."""
+    """Enhanced countdown with visual progress bar (█/─ style, matching your portfolio bars)."""
     print('')
     start_time = time.time()
     total = refresh_interval
@@ -180,17 +205,14 @@ def countdown(refresh_interval: int) -> bool:
         remaining = max(0, int(total - elapsed))
         progress = min(1.0, elapsed / total)
 
-        # Build progress bar using the exact same characters as your portfolio bars
         filled = int(round(progress * bar_width))
         bar = "█" * filled + "─" * (bar_width - filled)
 
-        # Main countdown line (extra padding ensures clean overwrite on any terminal width)
         msg = f"Next refresh in {remaining:3d}s  [{bar}]  (press r + Enter to refresh now, Ctrl+C to stop)"
 
         print(msg + " " * 40, end="\r")
         sys.stdout.flush()
 
-        # Check for manual refresh input (non-blocking, checked every second)
         remaining_wait = total - elapsed
         if remaining_wait <= 0:
             break
@@ -199,11 +221,10 @@ def countdown(refresh_interval: int) -> bool:
         if select.select([sys.stdin], [], [], wait_time)[0]:
             line = sys.stdin.readline().strip().lower()
             if line in ("r", "refresh"):
-                print("\n" + " " * (len(msg) + 60))  # clear the progress line
+                print("\n" + " " * (len(msg) + 60))
                 print("🔄 Manual refresh triggered!")
                 return True
 
-    # Final cleanup (erase the countdown line)
     print(" " * 150, end="\r")
     return False
 
@@ -310,7 +331,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print("=" * 90)
     print(f"Wallet  : {address}")
 
-    # NEW: Started line with original date + days elapsed (2 decimals) + hours in parentheses
     start_date, elapsed = get_start_info(portfolio["csv_filename"], now_kst)
     print(f"Started : {start_date} (KST)   [{elapsed}]")
 
@@ -337,15 +357,9 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     equiv1 = bal1 + (val2 / price1) if price1 > 0 else bal1
     equiv2 = bal2 + (val1 / price2) if price2 > 0 else bal2
 
-    # ===================================================================
-    # CROSS-PRICE RATIOS (CSV ONLY)
-    # These are the values you wanted kept in the CSV (orca_per_sol, pepe_per_btcb, etc.)
-    # even though they were removed from console output.
-    # Calculated purely from current CoinGecko prices.
-    # ===================================================================
     if price1 > 0 and price2 > 0:
-        ratio_asset2_per_asset1 = price1 / price2   # e.g. ORCA per 1 SOL, PEPE per 1 BTCB
-        ratio_asset1_per_asset2 = price2 / price1   # e.g. SOL per 1 ORCA, BTCB per 1 PEPE
+        ratio_asset2_per_asset1 = price1 / price2
+        ratio_asset1_per_asset2 = price2 / price1
     else:
         ratio_asset2_per_asset1 = 0.0
         ratio_asset1_per_asset2 = 0.0
@@ -392,7 +406,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
             f"{a2['col_prefix']}_equivalent_change": round(delta2, pepe_csv_round),
             f"{a1['col_prefix']}_equivalent_change_usd": round(delta1 * price1, 2),
             f"{a2['col_prefix']}_equivalent_change_usd": round(delta2 * price2, 2),
-            # === FIXED CROSS-RATIO COLUMNS (CSV ONLY) ===
             f"{a2['col_prefix']}_per_{a1['col_prefix']}": round(ratio_asset2_per_asset1, 6),
             f"{a1['col_prefix']}_per_{a2['col_prefix']}": round(ratio_asset1_per_asset2, 15),
             f"portfolio_{a1['col_prefix']}_ratio": round(ratio1, 6),
@@ -421,7 +434,14 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print_portfolio_bar(a1["symbol"], a2["symbol"], ratio1, bal1, bal2, price1, price2,
                         portfolio["bar_char1"], portfolio["bar_char2"])
 
-    # ====================== CUMULATIVE NEGATIVE USD CHANGES + VISUAL BAR + SKEW ======================
+    # ====================== NEW: LAST BALANCE CHANGE ======================
+    # (added exactly where you requested — right after the Portfolio Allocation Visual)
+    chg_col1 = f"{a1['col_prefix']}_balance_change"
+    chg_col2 = f"{a2['col_prefix']}_balance_change"
+    last_change_info = get_minutes_since_last_balance_change(portfolio["csv_filename"], chg_col1, chg_col2)
+    print(f"   Last balance change: {last_change_info}")
+
+    # ====================== CUMULATIVE NEGATIVE USD CHANGES ======================
     chg_col1 = f"{a1['col_prefix']}_balance_change_usd"
     chg_col2 = f"{a2['col_prefix']}_balance_change_usd"
     neg1, neg2 = get_cumulative_negative_changes(portfolio["csv_filename"], chg_col1, chg_col2)
@@ -434,7 +454,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     abs_neg2 = abs(neg2)
     total_loss = abs_neg1 + abs_neg2
 
-    # Balance Ratio
     if total_loss < 1e-6:
         balance_ratio = "1.00x"
         note = "(no losses recorded yet)"
@@ -451,14 +470,12 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
 
     print(f"   Balance Ratio ({a1['symbol']}/{a2['symbol']}): {balance_ratio}{note}")
 
-    # Skew line with emoji
     if total_loss > 1:
         loss_ratio1 = abs_neg1 / total_loss
         skew_pct = abs(loss_ratio1 * 100 - 50)
         skew_towards = a1['symbol'] if loss_ratio1 > 0.5 else a2['symbol']
         print(f"   ⚖️ Skew: {skew_pct:.1f}% towards {skew_towards}")
 
-    # Visual Loss Bar
     if total_loss > 1:
         loss_ratio1 = abs_neg1 / total_loss
         w = BASE_CONFIG["BAR_WIDTH"]
@@ -481,7 +498,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     else:
         print("\n📊 Cumulative Loss Distribution: (No significant losses recorded yet)")
 
-    # Remaining display
     print("\n🔄 Hypothetical Equivalents (USD base):")
     base_col1 = f"{a1['col_prefix']}_equivalent"
     base_col2 = f"{a2['col_prefix']}_equivalent"
