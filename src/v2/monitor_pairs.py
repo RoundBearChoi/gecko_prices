@@ -8,7 +8,11 @@ import sys
 import select
 from typing import Dict, Tuple
 from web3 import Web3
-import json  # ← NEW for absolute baseline
+import json
+from decimal import Decimal, getcontext
+
+# ========================= HIGH-PRECISION DECIMAL SETUP =========================
+getcontext().prec = 36  # More than enough for 18-decimal tokens + price precision
 
 # ========================= BASE CONFIG =========================
 BASE_CONFIG = {
@@ -24,7 +28,7 @@ BASE_CONFIG = {
     "PRICE_CACHE_SECONDS": 10,
 }
 
-ABSOLUTE_STARTS_FILE = "absolute_starts.json"  # ← NEW
+ABSOLUTE_STARTS_FILE = "absolute_starts.json"
 
 # ====================== GLOBAL PRICE CACHE ======================
 PRICE_CACHE: Dict = {
@@ -51,7 +55,10 @@ PORTFOLIOS = {
         "rpc_url": "https://bsc-dataseed.binance.org/",
         "csv_filename": "btcb_pepe_balances.csv",
         "asset1": {"symbol": "BTCB",  "cg_id": "binance-bitcoin", "balance_prec": 6, "price_prec": 2, "col_prefix": "btcb"},
-        "asset2": {"symbol": "PEPE",  "cg_id": "pepe",            "balance_prec": 2, "price_prec": 18, "col_prefix": "pepe"},
+        "asset2": {"symbol": "PEPE",  "cg_id": "pepe",            
+                   "balance_prec": 8,      # ← INCREASED for accurate PEPE display/equivalents
+                   "price_prec": 18, 
+                   "col_prefix": "pepe"},
         "bar_char1": "█",
         "bar_char2": "─",
         "btcb_contract": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
@@ -66,18 +73,18 @@ def _handle_rate_limit(error_msg: str = "") -> bool:
     msg_lower = error_msg.lower()
     return any(term in msg_lower for term in ["rate limit", "too many requests", "429", "rate exceeded"])
 
-def get_previous_balances(csv_filename: str, col1: str, col2: str) -> Tuple[float, float]:
+def get_previous_balances(csv_filename: str, col1: str, col2: str) -> Tuple[Decimal, Decimal]:
     if not os.path.isfile(csv_filename):
-        return 0.0, 0.0
+        return Decimal('0'), Decimal('0')
     try:
         with open(csv_filename, "r", newline="", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
             if not rows:
-                return 0.0, 0.0
+                return Decimal('0'), Decimal('0')
             last = rows[-1]
-            return float(last.get(col1, 0)), float(last.get(col2, 0))
+            return Decimal(str(last.get(col1, 0))), Decimal(str(last.get(col2, 0)))
     except Exception:
-        return 0.0, 0.0
+        return Decimal('0'), Decimal('0')
 
 def get_minutes_since_last_balance_change(csv_filename: str, chg_col1: str, chg_col2: str) -> str:
     if not os.path.isfile(csv_filename):
@@ -93,9 +100,9 @@ def get_minutes_since_last_balance_change(csv_filename: str, chg_col1: str, chg_
 
             for row in reversed(rows):
                 try:
-                    chg1 = float(row.get(chg_col1, 0) or 0)
-                    chg2 = float(row.get(chg_col2, 0) or 0)
-                    if abs(chg1) > 1e-9 or abs(chg2) > 1e-9:
+                    chg1 = Decimal(str(row.get(chg_col1, 0) or 0))
+                    chg2 = Decimal(str(row.get(chg_col2, 0) or 0))
+                    if abs(chg1) > Decimal('1e-9') or abs(chg2) > Decimal('1e-9'):
                         ts_str = row["timestamp_kst"]
                         last_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                         if last_dt.tzinfo is None:
@@ -136,7 +143,6 @@ def get_start_info(csv_filename: str, current_kst: datetime) -> tuple[str, str]:
         return "N/A (error reading CSV)", "N/A"
 
 def load_absolute_starts() -> Dict:
-    """Load manual absolute baseline from JSON (user-editable anytime)."""
     if not os.path.isfile(ABSOLUTE_STARTS_FILE):
         print(f"\n   {ABSOLUTE_STARTS_FILE} not found — skipping absolute baseline")
         return {}
@@ -148,8 +154,8 @@ def load_absolute_starts() -> Dict:
         print(f"\n   Could not load {ABSOLUTE_STARTS_FILE}: {e}")
         return {}
 
-# ====================== UPDATED: get_prices with caching ======================
-def get_prices(cg_ids: str) -> Dict[str, float]:
+# ====================== UPDATED: get_prices with Decimal ======================
+def get_prices(cg_ids: str) -> Dict[str, Decimal]:
     now = time.time()
     cache_age = now - PRICE_CACHE["timestamp"]
     if PRICE_CACHE["prices"] and cache_age < BASE_CONFIG["PRICE_CACHE_SECONDS"]:
@@ -162,7 +168,8 @@ def get_prices(cg_ids: str) -> Dict[str, float]:
             r = requests.get(url, timeout=15)
             r.raise_for_status()
             data = r.json()
-            prices = {k: v["usd"] for k, v in data.items()}
+            # Convert via str() to avoid any float precision loss
+            prices = {k: Decimal(str(v["usd"])) for k, v in data.items()}
             PRICE_CACHE["prices"] = prices
             PRICE_CACHE["timestamp"] = time.time()
             return prices
@@ -176,7 +183,7 @@ def get_prices(cg_ids: str) -> Dict[str, float]:
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-# ====================== ENHANCED COUNTDOWN ======================
+# ====================== ENHANCED COUNTDOWN & WAIT ======================
 def countdown(refresh_interval: int) -> bool:
     print('')
     start_time = time.time()
@@ -213,7 +220,6 @@ def countdown(refresh_interval: int) -> bool:
     print(" " * 150, end="\r")
     return False
 
-# ====================== RATE LIMIT PROGRESS BAR ======================
 def wait_with_progress(wait_seconds: int, reason: str = "Rate limit"):
     if wait_seconds <= 0:
         return
@@ -240,8 +246,8 @@ def wait_with_progress(wait_seconds: int, reason: str = "Rate limit"):
     print(" " * 180, end="\r")
     print(f"✅ {reason} cooldown finished.")
 
-# ====================== BALANCE FETCHERS ======================
-def get_sol_balance(rpc_url: str, pubkey: str) -> float:
+# ====================== BALANCE FETCHERS (now return Decimal) ======================
+def get_sol_balance(rpc_url: str, pubkey: str) -> Decimal:
     payload = {"jsonrpc": "2.0", "id": 1, "method": "getBalance", "params": [pubkey]}
     for attempt in range(5):
         try:
@@ -253,7 +259,7 @@ def get_sol_balance(rpc_url: str, pubkey: str) -> float:
                     wait_with_progress(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"], "Solana RPC rate limit")
                     continue
                 raise Exception(str(data["error"]))
-            return data["result"]["value"] / 1_000_000_000
+            return Decimal(data["result"]["value"]) / Decimal('1000000000')
         except Exception as e:
             if _handle_rate_limit(str(e)) and attempt < 4:
                 wait_with_progress(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"], "Solana RPC rate limit")
@@ -261,7 +267,7 @@ def get_sol_balance(rpc_url: str, pubkey: str) -> float:
             raise
     raise Exception("SOL balance fetch failed after retries")
 
-def get_orca_balance(rpc_url: str, pubkey: str, orca_mint: str) -> float:
+def get_orca_balance(rpc_url: str, pubkey: str, orca_mint: str) -> Decimal:
     payload = {
         "jsonrpc": "2.0", "id": 1, "method": "getTokenAccountsByOwner",
         "params": [pubkey, {"mint": orca_mint}, {"encoding": "jsonParsed"}]
@@ -276,9 +282,9 @@ def get_orca_balance(rpc_url: str, pubkey: str, orca_mint: str) -> float:
                 continue
             accounts = data.get("result", {}).get("value", [])
             if not accounts:
-                return 0.0
+                return Decimal('0')
             info = accounts[0]["account"]["data"]["parsed"]["info"]["tokenAmount"]
-            return int(info["amount"]) / (10 ** int(info["decimals"]))
+            return Decimal(info["amount"]) / Decimal(10 ** int(info["decimals"]))
         except Exception as e:
             if _handle_rate_limit(str(e)) and attempt < 4:
                 wait_with_progress(BASE_CONFIG["RATE_LIMIT_WAIT_SECONDS"], "Solana RPC rate limit")
@@ -286,7 +292,7 @@ def get_orca_balance(rpc_url: str, pubkey: str, orca_mint: str) -> float:
             raise
     raise Exception("ORCA balance fetch failed after retries")
 
-def get_erc20_balance(w3: Web3, address: str, token_contract: str) -> float:
+def get_erc20_balance(w3: Web3, address: str, token_contract: str) -> Decimal:
     abi = [
         {"constant": True, "inputs": [{"name": "_owner", "type": "address"}], "name": "balanceOf", "outputs": [{"name": "balance", "type": "uint256"}], "type": "function"},
         {"constant": True, "inputs": [], "name": "decimals", "outputs": [{"name": "", "type": "uint8"}], "type": "function"},
@@ -294,19 +300,19 @@ def get_erc20_balance(w3: Web3, address: str, token_contract: str) -> float:
     contract = w3.eth.contract(address=token_contract, abi=abi)
     raw = contract.functions.balanceOf(address).call()
     decimals = contract.functions.decimals().call()
-    return raw / (10 ** decimals)
+    return Decimal(raw) / Decimal(10 ** decimals)
 
-# ====================== PORTFOLIO BAR ======================
-def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: float, bal1: float, bal2: float,
-                        price1: float, price2: float, bar_char1: str, bar_char2: str):
-    ratio2 = 1.0 - ratio1
+# ====================== PORTFOLIO BAR (updated for Decimal) ======================
+def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: Decimal, bal1: Decimal, bal2: Decimal,
+                        price1: Decimal, price2: Decimal, bar_char1: str, bar_char2: str):
+    ratio2 = Decimal('1') - ratio1
     w = BASE_CONFIG["BAR_WIDTH"]
-    blocks1 = int(round(ratio1 * w))
+    blocks1 = int(round(float(ratio1) * w))
     bar = bar_char1 * blocks1 + bar_char2 * (w - blocks1)
 
     prec = BASE_CONFIG["PERCENT_PRECISION"]
-    label1 = f"{ratio1*100:.{prec}f}% {asset1_sym}"
-    label2 = f"{ratio2*100:.{prec}f}% {asset2_sym}"
+    label1 = f"{float(ratio1)*100:.{prec}f}% {asset1_sym}"
+    label2 = f"{float(ratio2)*100:.{prec}f}% {asset2_sym}"
 
     print("\n📊 Portfolio Allocation Visual:")
     if BASE_CONFIG["SHOW_HEADER_LABELS"]:
@@ -318,17 +324,17 @@ def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: float, bal1: f
     if BASE_CONFIG["SHOW_50_PERCENT_MARKER"]:
         print(f"   {'50%':^{w}}")
 
-    total_usd = bal1 * price1 + bal2 * price2
+    total_usd = float(bal1 * price1 + bal2 * price2)
     if total_usd > 1.0:
         target = total_usd / 2
-        excess = (bal1 * price1) - target
+        excess = float(bal1 * price1) - target
         if excess >= 0:
-            sell1 = excess / price1
-            buy2 = excess / price2
+            sell1 = excess / float(price1)
+            buy2 = excess / float(price2)
             print(f"   To 50:50 → Sell ~{sell1:.6f} {asset1_sym} (~${excess:.2f} USD) to buy ~{buy2:.4f} {asset2_sym}")
         else:
-            sell2 = abs(excess) / price2
-            buy1 = abs(excess) / price1
+            sell2 = abs(excess) / float(price2)
+            buy1 = abs(excess) / float(price1)
             print(f"   To 50:50 → Sell ~{sell2:.4f} {asset2_sym} (~${abs(excess):.2f} USD) to buy ~{buy1:.6f} {asset1_sym}")
     else:
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
@@ -349,7 +355,7 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     print(f"Updated : {timestamp_str} (KST)")
     print("=" * 90)
 
-    # Fetch balances
+    # Fetch balances (now Decimal)
     if portfolio["chain"] == "solana":
         bal1 = get_sol_balance(portfolio["rpc_url"], address)
         bal2 = get_orca_balance(portfolio["rpc_url"], address, portfolio["orca_mint"])
@@ -361,10 +367,11 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     price1 = prices[portfolio["asset1"]["cg_id"]]
     price2 = prices[portfolio["asset2"]["cg_id"]]
 
+    # All math now exact with Decimal
     val1 = bal1 * price1
     val2 = bal2 * price2
     total_usd = val1 + val2
-    ratio1 = val1 / total_usd if total_usd > 0 else 0.0
+    ratio1 = val1 / total_usd if total_usd > 0 else Decimal('0')
 
     equiv1 = bal1 + (val2 / price1) if price1 > 0 else bal1
     equiv2 = bal2 + (val1 / price2) if price2 > 0 else bal2
@@ -373,14 +380,21 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
         ratio_asset2_per_asset1 = price1 / price2
         ratio_asset1_per_asset2 = price2 / price1
     else:
-        ratio_asset2_per_asset1 = 0.0
-        ratio_asset1_per_asset2 = 0.0
+        ratio_asset2_per_asset1 = Decimal('0')
+        ratio_asset1_per_asset2 = Decimal('0')
 
-    # ====================== CSV WRITING ======================
+    # ====================== CSV WRITING (higher PEPE precision) ======================
+    a1 = portfolio["asset1"]
+    a2 = portfolio["asset2"]
+
+    if a2['symbol'] == "PEPE":
+        csv_balance_prec = 10   # plenty for 18-decimal token
+        csv_equiv_prec   = 8
+    else:
+        csv_balance_prec = 9
+        csv_equiv_prec   = 9
+
     if save_to_csv:
-        a1 = portfolio["asset1"]
-        a2 = portfolio["asset2"]
-
         prev_col1 = f"{a1['col_prefix']}_balance"
         prev_col2 = f"{a2['col_prefix']}_balance"
         prev1, prev2 = get_previous_balances(portfolio["csv_filename"], prev_col1, prev_col2)
@@ -390,28 +404,26 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
         change_usd1 = change1 * price1
         change_usd2 = change2 * price2
 
-        pepe_csv_round = 4 if a2['symbol'] == "PEPE" else 9
-
         row = {
             "timestamp_kst": now_kst.isoformat(),
             "readable_time_kst": timestamp_str,
-            f"{a1['col_prefix']}_balance": round(bal1, 9),
-            f"{a1['col_prefix']}_balance_change": round(change1, 9),
-            f"{a1['col_prefix']}_balance_change_usd": round(change_usd1, 2),
-            f"{a2['col_prefix']}_balance": round(bal2, pepe_csv_round),
-            f"{a2['col_prefix']}_balance_change": round(change2, pepe_csv_round),
-            f"{a2['col_prefix']}_balance_change_usd": round(change_usd2, 2),
-            f"{a1['col_prefix']}_price_usd": round(price1, 6),
-            f"{a2['col_prefix']}_price_usd": round(price2, 18 if a2['symbol'] == "PEPE" else 6),
-            f"{a1['col_prefix']}_value_usd": round(val1, 2),
-            f"{a2['col_prefix']}_value_usd": round(val2, 2),
-            "total_value_usd": round(total_usd, 2),
-            f"{a1['col_prefix']}_equivalent": round(equiv1, 9),
-            f"{a2['col_prefix']}_equivalent": round(equiv2, pepe_csv_round),
-            f"{a2['col_prefix']}_per_{a1['col_prefix']}": round(ratio_asset2_per_asset1, 6),
-            f"{a1['col_prefix']}_per_{a2['col_prefix']}": round(ratio_asset1_per_asset2, 15),
-            f"portfolio_{a1['col_prefix']}_ratio": round(ratio1, 6),
-            f"portfolio_{a2['col_prefix']}_ratio": round(1 - ratio1, 6),
+            f"{a1['col_prefix']}_balance": round(float(bal1), 9),
+            f"{a1['col_prefix']}_balance_change": round(float(change1), 9),
+            f"{a1['col_prefix']}_balance_change_usd": round(float(change_usd1), 2),
+            f"{a2['col_prefix']}_balance": round(float(bal2), csv_balance_prec),
+            f"{a2['col_prefix']}_balance_change": round(float(change2), csv_balance_prec),
+            f"{a2['col_prefix']}_balance_change_usd": round(float(change_usd2), 2),
+            f"{a1['col_prefix']}_price_usd": round(float(price1), 6),
+            f"{a2['col_prefix']}_price_usd": round(float(price2), 18 if a2['symbol'] == "PEPE" else 6),
+            f"{a1['col_prefix']}_value_usd": round(float(val1), 2),
+            f"{a2['col_prefix']}_value_usd": round(float(val2), 2),
+            "total_value_usd": round(float(total_usd), 2),
+            f"{a1['col_prefix']}_equivalent": round(float(equiv1), 9),
+            f"{a2['col_prefix']}_equivalent": round(float(equiv2), csv_equiv_prec),
+            f"{a2['col_prefix']}_per_{a1['col_prefix']}": round(float(ratio_asset2_per_asset1), 6),
+            f"{a1['col_prefix']}_per_{a2['col_prefix']}": round(float(ratio_asset1_per_asset2), 15),
+            f"portfolio_{a1['col_prefix']}_ratio": round(float(ratio1), 6),
+            f"portfolio_{a2['col_prefix']}_ratio": round(float(Decimal('1') - ratio1), 6),
         }
 
         fieldnames = list(row.keys())
@@ -427,11 +439,9 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
 
     # ====================== DISPLAY SECTION ======================
     print("\n📊 Current Balances:")
-    a1 = portfolio["asset1"]
-    a2 = portfolio["asset2"]
-    print(f"   {a1['symbol']:4} : {bal1:,.{a1['balance_prec']}f} {a1['symbol']} (${val1:,.2f})")
-    print(f"   {a2['symbol']:4} : {bal2:,.{a2['balance_prec']}f} {a2['symbol']} (${val2:,.2f})")
-    print(f"   TOTAL : ${total_usd:,.2f}")
+    print(f"   {a1['symbol']:4} : {bal1:,.{a1['balance_prec']}f} {a1['symbol']} (${float(val1):,.2f})")
+    print(f"   {a2['symbol']:4} : {bal2:,.{a2['balance_prec']}f} {a2['symbol']} (${float(val2):,.2f})")
+    print(f"   TOTAL : ${float(total_usd):,.2f}")
 
     print_portfolio_bar(a1["symbol"], a2["symbol"], ratio1, bal1, bal2, price1, price2,
                         portfolio["bar_char1"], portfolio["bar_char2"])
@@ -441,30 +451,28 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     last_change_info = get_minutes_since_last_balance_change(portfolio["csv_filename"], chg_col1, chg_col2)
     print(f"   Last balance change: {last_change_info}")
 
-    # ====================== HYPOTHETICAL EQUIVALENTS (Absolute Baseline only) ======================
+    # ====================== HYPOTHETICAL EQUIVALENTS (Absolute Baseline) ======================
     print("\n🔄 Hypothetical Equivalents (USD base):")
-
-    # vs Absolute Baseline (JSON) — Net Δ removed
     absolute_starts = load_absolute_starts()
 
     for asset, current_equiv, current_price in [(a1, equiv1, price1), (a2, equiv2, price2)]:
         prefix = asset["col_prefix"]
         base_data = absolute_starts.get(prefix, {})
         if base_data and "equivalent" in base_data:
-            base_equiv = float(base_data["equivalent"])
+            base_equiv = Decimal(str(base_data["equivalent"]))
             base_date = base_data.get("date_kst", "Unknown date")
             delta_abs = current_equiv - base_equiv
             delta_usd = delta_abs * current_price
 
             print(f"   {asset['symbol']} equivalent : {current_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
             print(f"   Base : {base_equiv:,.{asset['balance_prec']}f} on {base_date}")
-            print(f"   Δ    : {delta_abs:+,.{asset['balance_prec']}f} | ${delta_usd:+,.2f}")
+            print(f"   Δ    : {delta_abs:+,.{asset['balance_prec']}f} | ${float(delta_usd):+,.2f}")
         else:
             print(f"      {asset['symbol']}: No absolute baseline set in {ABSOLUTE_STARTS_FILE}")
 
     print("\n💰 Current Prices:")
-    print(f"   {a1['symbol']} = ${price1:,.{a1['price_prec']}f}")
-    print(f"   {a2['symbol']} = ${price2:,.{a2['price_prec']}f}")
+    print(f"   {a1['symbol']} = ${float(price1):,.{a1['price_prec']}f}")
+    print(f"   {a2['symbol']} = ${float(price2):,.{a2['price_prec']}f}")
 
     if not save_to_csv:
         print("CSV skipped (automatic refresh)")
