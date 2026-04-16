@@ -1,19 +1,14 @@
 {
-    "sol": {
-        "equivalent": 42.155524205,
-        "date_kst": "2026-04-10 11:08:21 KST"
+    "sol_orca": {
+        "date_kst": "2026-04-10 11:08:21 KST",
+        "sol": 42.155524205,
+        "orca": 3908.462306954,
+        "total_usd": 3509.45
     },
-    "orca": {
-        "equivalent": 3908.462306954,
-        "date_kst": "2026-04-10 11:08:21 KST"
-    },
-
-    "btcb": {
-        "equivalent": 0.047362528,
-        "date_kst": "2026-04-11 19:05:51 KST"
-    },
-    "pepe": {
-        "equivalent": 960488964.56,
-        "date_kst": "2026-04-11 19:05:51 KST"
+    "btcb_pepe": {
+        "date_kst": "2026-04-11 19:05:51 KST",
+        "btcb": 0.047362528,
+        "pepe": 960488964.56,
+        "total_usd": 3452.38
     }
 }
