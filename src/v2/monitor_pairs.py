@@ -315,17 +315,19 @@ def get_erc20_balance(w3: Web3, address: str, token_contract: str) -> Decimal:
     decimals = contract.functions.decimals().call()
     return Decimal(raw) / Decimal(10 ** decimals)
 
-# ====================== PORTFOLIO BAR (now fully Decimal) ======================
+# ====================== PORTFOLIO BAR (NOW FULLY DECIMAL — ZERO FLOAT) ======================
 def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: Decimal, bal1: Decimal, bal2: Decimal,
                         price1: Decimal, price2: Decimal, bar_char1: str, bar_char2: str):
     ratio2 = Decimal('1') - ratio1
     w = BASE_CONFIG["BAR_WIDTH"]
-    blocks1 = int(round(float(ratio1) * w))  # visual only — no accuracy impact
+    # Pure Decimal calculation for bar blocks (no float)
+    blocks1_decimal = (ratio1 * Decimal(w)).quantize(Decimal('1'), rounding='ROUND_HALF_EVEN')
+    blocks1 = int(blocks1_decimal)
     bar = bar_char1 * blocks1 + bar_char2 * (w - blocks1)
 
     prec = BASE_CONFIG["PERCENT_PRECISION"]
-    label1 = f"{float(ratio1)*100:.{prec}f}% {asset1_sym}"
-    label2 = f"{float(ratio2)*100:.{prec}f}% {asset2_sym}"
+    label1 = f"{ratio1 * Decimal('100'):.{prec}f}% {asset1_sym}"
+    label2 = f"{ratio2 * Decimal('100'):.{prec}f}% {asset2_sym}"
 
     print("\n📊 Portfolio Allocation Visual:")
     if BASE_CONFIG["SHOW_HEADER_LABELS"]:
@@ -344,11 +346,11 @@ def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: Decimal, bal1:
         if excess >= 0:
             sell1 = excess / price1
             buy2 = excess / price2
-            print(f"   To 50:50 → Sell ~{sell1:.6f} {asset1_sym} (~${float(excess):.2f} USD) to buy ~{buy2:.4f} {asset2_sym}")
+            print(f"   To 50:50 → Sell ~{sell1:.6f} {asset1_sym} (~${excess:.2f} USD) to buy ~{buy2:.4f} {asset2_sym}")
         else:
             sell2 = abs(excess) / price2
             buy1 = abs(excess) / price1
-            print(f"   To 50:50 → Sell ~{sell2:.4f} {asset2_sym} (~${float(abs(excess)):.2f} USD) to buy ~{buy1:.6f} {asset1_sym}")
+            print(f"   To 50:50 → Sell ~{sell2:.4f} {asset2_sym} (~${abs(excess):.2f} USD) to buy ~{buy1:.6f} {asset1_sym}")
     else:
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
 
@@ -438,11 +440,11 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
                 print(f"✅ Appended new row to: {portfolio['csv_filename']}")
             writer.writerow(row)
 
-    # ====================== DISPLAY SECTION ======================
+    # ====================== DISPLAY SECTION (ALL DECIMAL FORMATTING) ======================
     print("\n📊 Current Balances:")
-    print(f"   {a1['symbol']:4} : {bal1:,.{a1['balance_prec']}f} {a1['symbol']} (${float(val1):,.2f})")
-    print(f"   {a2['symbol']:4} : {bal2:,.{a2['balance_prec']}f} {a2['symbol']} (${float(val2):,.2f})")
-    print(f"   TOTAL : ${float(total_usd):,.2f}")
+    print(f"   {a1['symbol']:4} : {bal1:,.{a1['balance_prec']}f} {a1['symbol']} (${val1:,.2f})")
+    print(f"   {a2['symbol']:4} : {bal2:,.{a2['balance_prec']}f} {a2['symbol']} (${val2:,.2f})")
+    print(f"   TOTAL : ${total_usd:,.2f}")
 
     print_portfolio_bar(a1["symbol"], a2["symbol"], ratio1, bal1, bal2, price1, price2,
                         portfolio["bar_char1"], portfolio["bar_char2"])
@@ -470,24 +472,25 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
                 delta_usd = delta_abs * current_price
                 print(f"   {asset['symbol']} equivalent : {current_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
                 print(f"   Base          : {base_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
-                print(f"   Δ             : {delta_abs:+,.{asset['balance_prec']}f} | ${float(delta_usd):+,.2f}")
+                print(f"   Δ             : {delta_abs:+,.{asset['balance_prec']}f} | ${delta_usd:+,.2f}")
             else:
                 print(f"      {asset['symbol']}: No baseline found under pair key '{pair_key}'")
 
         if "total_usd" in pair_data:
             base_total = Decimal(str(pair_data["total_usd"]))
             delta_total_usd = total_usd - base_total
-            pct_str = f" ({float((delta_total_usd / base_total)*100):+.2f}%)" if base_total > 0 else ""
+            pct = (delta_total_usd / base_total * Decimal('100')) if base_total > 0 else Decimal('0')
+            pct_str = f" ({pct:+.2f}%)" if base_total > 0 else ""
             print("\n📈 Total Portfolio (USD):")
-            print(f"   Current    : ${float(total_usd):,.2f}")
-            print(f"   Baseline   : ${float(base_total):,.2f}")
-            print(f"   Change     : ${float(delta_total_usd):+,.2f}{pct_str}")
+            print(f"   Current    : ${total_usd:,.2f}")
+            print(f"   Baseline   : ${base_total:,.2f}")
+            print(f"   Change     : ${delta_total_usd:+,.2f}{pct_str}")
     else:
         print(f"   No absolute baseline set for this pair ('{pair_key}') in {ABSOLUTE_STARTS_FILE}")
 
     print("\n💰 Current Prices:")
-    print(f"   {a1['symbol']} = ${float(price1):,.{a1['price_prec']}f}")
-    print(f"   {a2['symbol']} = ${float(price2):,.{a2['price_prec']}f}")
+    print(f"   {a1['symbol']} = ${price1:,.{a1['price_prec']}f}")
+    print(f"   {a2['symbol']} = ${price2:,.{a2['price_prec']}f}")
 
     if not save_to_csv:
         print("CSV skipped (automatic refresh)")
