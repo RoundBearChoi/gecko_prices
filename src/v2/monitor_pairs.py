@@ -8,6 +8,7 @@ import sys
 import select
 from typing import Dict, Tuple
 from web3 import Web3
+import json  # ← NEW for absolute baseline
 
 # ========================= BASE CONFIG =========================
 BASE_CONFIG = {
@@ -22,6 +23,8 @@ BASE_CONFIG = {
     "RATE_LIMIT_WAIT_SECONDS": 60 * 2,
     "PRICE_CACHE_SECONDS": 10,
 }
+
+ABSOLUTE_STARTS_FILE = "absolute_starts.json"  # ← NEW
 
 # ====================== GLOBAL PRICE CACHE ======================
 PRICE_CACHE: Dict = {
@@ -163,6 +166,20 @@ def get_start_info(csv_filename: str, current_kst: datetime) -> tuple[str, str]:
     except Exception:
         return "N/A (error reading CSV)", "N/A"
 
+def load_absolute_starts() -> Dict:
+    """Load manual absolute baseline from JSON (user-editable anytime)."""
+    if not os.path.isfile(ABSOLUTE_STARTS_FILE):
+        print(f"\n   {ABSOLUTE_STARTS_FILE} not found — skipping absolute baseline")
+        return {}
+    try:
+        with open(ABSOLUTE_STARTS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # no need to print on successful load
+        return data
+    except Exception as e:
+        print(f"\n   Could not load {ABSOLUTE_STARTS_FILE}: {e}")
+        return {}
+
 # ====================== UPDATED: get_prices with caching ======================
 def get_prices(cg_ids: str) -> Dict[str, float]:
     now = time.time()
@@ -178,7 +195,6 @@ def get_prices(cg_ids: str) -> Dict[str, float]:
             r.raise_for_status()
             data = r.json()
             prices = {k: v["usd"] for k, v in data.items()}
-            # update cache
             PRICE_CACHE["prices"] = prices
             PRICE_CACHE["timestamp"] = time.time()
             return prices
@@ -523,14 +539,41 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     else:
         print("\n📊 Cumulative Loss Distribution: (No significant losses recorded yet)")
 
+    # ====================== HYPOTHETICAL EQUIVALENTS - TWO PARTS ======================
     print("\n🔄 Hypothetical Equivalents (USD base):")
+
+    # 1. vs CSV Start → now shows the baseline equivalents + date (exactly like Absolute Baseline)
     base_col1 = f"{a1['col_prefix']}_equivalent"
     base_col2 = f"{a2['col_prefix']}_equivalent"
     base1, base2 = get_first_equivalents(portfolio["csv_filename"], base_col1, base_col2)
-    delta1 = equiv1 - base1
-    delta2 = equiv2 - base2
-    print(f"   {a1['symbol']} equivalent : {equiv1:,.{a1['balance_prec']}f} {a1['symbol']}  (Δ {delta1:+,.{a1['balance_prec']}f} | ${delta1*price1:+,.2f})")
-    print(f"   {a2['symbol']} equivalent : {equiv2:,.{a2['balance_prec']}f} {a2['symbol']}  (Δ {delta2:+,.{a2['balance_prec']}f} | ${delta2*price2:+,.2f})")
+
+    print(f"   vs CSV Start →")
+    for asset, current_equiv, base_equiv, current_price in [
+        (a1, equiv1, base1, price1),
+        (a2, equiv2, base2, price2)
+    ]:
+        delta = current_equiv - base_equiv
+        delta_usd = delta * current_price
+        print(f"      {asset['symbol']} equivalent : {current_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
+        print(f"         Base : {base_equiv:,.{asset['balance_prec']}f} on {start_date}")
+        print(f"         Δ    : {delta:+,.{asset['balance_prec']}f} | ${delta_usd:+,.2f}")
+
+    # 2. vs Absolute Baseline (JSON) - unchanged (already perfect)
+    absolute_starts = load_absolute_starts()
+    print(f"\n   vs Absolute Baseline (JSON) →")
+    for asset, current_equiv, current_price in [(a1, equiv1, price1), (a2, equiv2, price2)]:
+        prefix = asset["col_prefix"]
+        base_data = absolute_starts.get(prefix, {})
+        if base_data and "equivalent" in base_data:
+            base_equiv = float(base_data["equivalent"])
+            base_date = base_data.get("date_kst", "Unknown date")
+            delta_abs = current_equiv - base_equiv
+            delta_usd = delta_abs * current_price
+            print(f"      {asset['symbol']} equivalent : {current_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
+            print(f"         Base : {base_equiv:,.{asset['balance_prec']}f} on {base_date}")
+            print(f"         Δ    : {delta_abs:+,.{asset['balance_prec']}f} | ${delta_usd:+,.2f}")
+        else:
+            print(f"      {asset['symbol']}: No absolute baseline set in {ABSOLUTE_STARTS_FILE}")
 
     print("\n💰 Current Prices:")
     print(f"   {a1['symbol']} ≈ ${price1:,.{a1['price_prec']}f}")

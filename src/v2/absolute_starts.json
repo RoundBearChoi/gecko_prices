@@ -1,0 +1,18 @@
+{
+    "sol": {
+        "equivalent": 42.155524205,
+        "date_kst": "2026-04-10 11:08:21 KST"
+    },
+    "orca": {
+        "equivalent": 3908.462306954,
+        "date_kst": "2026-04-10 11:08:21 KST"
+    },
+    "btcb": {
+        "equivalent": 0.047362528,
+        "date_kst": "2026-04-11 19:05:51 KST"
+    },
+    "pepe": {
+        "equivalent": 960488964.56,
+        "date_kst": "2026-04-11 19:05:51 KST"
+    }
+}
