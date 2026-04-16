@@ -92,24 +92,6 @@ def get_first_equivalents(csv_filename: str, col1: str, col2: str) -> Tuple[floa
     except Exception:
         return 0.0, 0.0
 
-def get_cumulative_negative_changes(csv_filename: str, chg_col1: str, chg_col2: str) -> Tuple[float, float]:
-    if not os.path.isfile(csv_filename):
-        return 0.0, 0.0
-    cum1 = cum2 = 0.0
-    try:
-        with open(csv_filename, "r", newline="", encoding="utf-8") as f:
-            for row in csv.DictReader(f):
-                try:
-                    v1 = float(row.get(chg_col1, 0) or 0)
-                    v2 = float(row.get(chg_col2, 0) or 0)
-                    if v1 < 0: cum1 += v1
-                    if v2 < 0: cum2 += v2
-                except (ValueError, TypeError):
-                    continue
-        return cum1, cum2
-    except Exception:
-        return 0.0, 0.0
-
 def get_minutes_since_last_balance_change(csv_filename: str, chg_col1: str, chg_col2: str) -> str:
     if not os.path.isfile(csv_filename):
         return "No CSV yet"
@@ -482,62 +464,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     last_change_info = get_minutes_since_last_balance_change(portfolio["csv_filename"], chg_col1, chg_col2)
     print(f"   Last balance change: {last_change_info}")
 
-    chg_col1 = f"{a1['col_prefix']}_balance_change_usd"
-    chg_col2 = f"{a2['col_prefix']}_balance_change_usd"
-    neg1, neg2 = get_cumulative_negative_changes(portfolio["csv_filename"], chg_col1, chg_col2)
-
-    print("\n📉 Cumulative Negative USD Changes:")
-    print(f"   {a1['symbol']:4} : ${neg1:,.2f}      |      {a2['symbol']:4} : ${neg2:,.2f}")
-    print(f"   Difference : ${abs(neg2 - neg1):.2f}")
-
-    abs_neg1 = abs(neg1)
-    abs_neg2 = abs(neg2)
-    total_loss = abs_neg1 + abs_neg2
-
-    if total_loss < 1e-6:
-        balance_ratio = "1.00x"
-        note = "(no losses recorded yet)"
-    elif abs_neg2 < 1e-6:
-        balance_ratio = "∞"
-        note = f"(only {a1['symbol']} has losses)"
-    elif abs_neg1 < 1e-6:
-        balance_ratio = "0.00x"
-        note = f"(only {a2['symbol']} has losses)"
-    else:
-        ratio = abs_neg1 / abs_neg2
-        balance_ratio = f"{ratio:.2f}x"
-        note = " (1.0x = perfectly balanced)"
-
-    print(f"   Balance Ratio ({a1['symbol']}/{a2['symbol']}): {balance_ratio}{note}")
-
-    if total_loss > 1:
-        loss_ratio1 = abs_neg1 / total_loss
-        skew_pct = abs(loss_ratio1 * 100 - 50)
-        skew_towards = a1['symbol'] if loss_ratio1 > 0.5 else a2['symbol']
-        print(f"   ⚖️ Skew: {skew_pct:.1f}% towards {skew_towards}")
-
-    if total_loss > 1:
-        loss_ratio1 = abs_neg1 / total_loss
-        w = BASE_CONFIG["BAR_WIDTH"]
-        blocks1 = int(round(loss_ratio1 * w))
-        bar = portfolio["bar_char1"] * blocks1 + portfolio["bar_char2"] * (w - blocks1)
-
-        prec = BASE_CONFIG["PERCENT_PRECISION"]
-        label1 = f"{loss_ratio1*100:.{prec}f}% {a1['symbol']}"
-        label2 = f"{(1-loss_ratio1)*100:.{prec}f}% {a2['symbol']}"
-
-        print("\n📊 Cumulative Loss Distribution:")
-        if BASE_CONFIG["SHOW_HEADER_LABELS"]:
-            padding = " " * (w - len(a1['symbol']) - len(a2['symbol']))
-            print(f"   {a1['symbol']}{padding}{a2['symbol']}")
-        print(f"   {bar}")
-        spacing = w - len(label1) - len(label2) + 8
-        print(f"   {label1}{' ' * spacing}{label2}")
-        if BASE_CONFIG["SHOW_50_PERCENT_MARKER"]:
-            print(f"   {'50% ideal balance':^{w}}")
-    else:
-        print("\n📊 Cumulative Loss Distribution: (No significant losses recorded yet)")
-
     # ====================== HYPOTHETICAL EQUIVALENTS (Absolute Baseline only) ======================
     print("\n🔄 Hypothetical Equivalents (USD base):")
 
@@ -559,8 +485,8 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
             print(f"      {asset['symbol']}: No absolute baseline set in {ABSOLUTE_STARTS_FILE}")
 
     print("\n💰 Current Prices:")
-    print(f"   {a1['symbol']} ≈ ${price1:,.{a1['price_prec']}f}")
-    print(f"   {a2['symbol']}  = ${price2:,.{a2['price_prec']}f}")
+    print(f"   {a1['symbol']} = ${price1:,.{a1['price_prec']}f}")
+    print(f"   {a2['symbol']} = ${price2:,.{a2['price_prec']}f}")
 
     if not save_to_csv:
         print("CSV skipped (automatic refresh)")
