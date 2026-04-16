@@ -284,7 +284,7 @@ def get_erc20_balance(w3: Web3, address: str, token_contract: str) -> float:
     decimals = contract.functions.decimals().call()
     return raw / (10 ** decimals)
 
-# ====================== PORTFOLIO BAR ======================
+# ====================== UPDATED PORTFOLIO BAR (no thousands separators in rebalance line) ======================
 def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: float, bal1: float, bal2: float,
                         price1: float, price2: float, bar_char1: str, bar_char2: str):
     ratio2 = 1.0 - ratio1
@@ -313,11 +313,11 @@ def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: float, bal1: f
         if excess >= 0:
             sell1 = excess / price1
             buy2 = excess / price2
-            print(f"   To 50:50 → Sell ~{sell1:,.6f} {asset1_sym} (~${excess:,.2f} USD) to buy ~{buy2:,.4f} {asset2_sym}")
+            print(f"   To 50:50 → Sell ~{sell1:.6f} {asset1_sym} (~${excess:.2f} USD) to buy ~{buy2:.4f} {asset2_sym}")
         else:
             sell2 = abs(excess) / price2
             buy1 = abs(excess) / price1
-            print(f"   To 50:50 → Sell ~{sell2:,.4f} {asset2_sym} (~${abs(excess):,.2f} USD) to buy ~{buy1:,.6f} {asset1_sym}")
+            print(f"   To 50:50 → Sell ~{sell2:.4f} {asset2_sym} (~${abs(excess):.2f} USD) to buy ~{buy1:.6f} {asset1_sym}")
     else:
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
 
@@ -435,7 +435,6 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
                         portfolio["bar_char1"], portfolio["bar_char2"])
 
     # ====================== NEW: LAST BALANCE CHANGE ======================
-    # (added exactly where you requested — right after the Portfolio Allocation Visual)
     chg_col1 = f"{a1['col_prefix']}_balance_change"
     chg_col2 = f"{a2['col_prefix']}_balance_change"
     last_change_info = get_minutes_since_last_balance_change(portfolio["csv_filename"], chg_col1, chg_col2)
