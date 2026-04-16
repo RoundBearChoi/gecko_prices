@@ -13,6 +13,7 @@ from web3 import Web3
 BASE_CONFIG = {
     "KST_TIMEZONE": "Asia/Seoul",
     "BAR_WIDTH": 80,
+    "COUNTDOWN_BAR_WIDTH": 40,          # ← NEW: width of the countdown progress bar
     "SHOW_HEADER_LABELS": True,
     "SHOW_50_PERCENT_MARKER": True,
     "PERCENT_PRECISION": 1,
@@ -159,17 +160,51 @@ def get_prices(cg_ids: str) -> Dict[str, float]:
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
+# ====================== ENHANCED COUNTDOWN WITH PROGRESS BAR ======================
 def countdown(refresh_interval: int) -> bool:
+    """Enhanced countdown with visual progress bar (█/─ style, matching your portfolio bars).
+    - Progress bar fills as time passes toward the next refresh.
+    - Real-time update every second using time.time() for precision.
+    - Still fully supports manual 'r' + Enter refresh and Ctrl+C.
+    - Clean line overwrite + final cleanup to prevent visual artifacts."""
     print('')
-    for remaining in range(refresh_interval, 0, -1):
-        print(f"Next refresh in {remaining:2d}s... (press r then Enter to refresh now, Ctrl+C to stop)", end="\r")
+    start_time = time.time()
+    total = refresh_interval
+    bar_width = BASE_CONFIG["COUNTDOWN_BAR_WIDTH"]
+
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed >= total:
+            break
+
+        remaining = max(0, int(total - elapsed))
+        progress = min(1.0, elapsed / total)
+
+        # Build progress bar using the exact same characters as your portfolio bars
+        filled = int(round(progress * bar_width))
+        bar = "█" * filled + "─" * (bar_width - filled)
+
+        # Main countdown line (extra padding ensures clean overwrite on any terminal width)
+        msg = f"Next refresh in {remaining:3d}s  [{bar}]  (press r + Enter to refresh now, Ctrl+C to stop)"
+
+        print(msg + " " * 40, end="\r")
         sys.stdout.flush()
-        if select.select([sys.stdin], [], [], 1.0)[0]:
+
+        # Check for manual refresh input (non-blocking, checked every second)
+        remaining_wait = total - elapsed
+        if remaining_wait <= 0:
+            break
+        wait_time = min(1.0, remaining_wait)
+
+        if select.select([sys.stdin], [], [], wait_time)[0]:
             line = sys.stdin.readline().strip().lower()
             if line in ("r", "refresh"):
-                print("\n🔄 Manual refresh triggered!")
+                print("\n" + " " * (len(msg) + 60))  # clear the progress line
+                print("🔄 Manual refresh triggered!")
                 return True
-    print(" " * 100, end="\r")
+
+    # Final cleanup (erase the countdown line)
+    print(" " * 150, end="\r")
     return False
 
 # ====================== BALANCE FETCHERS ======================
