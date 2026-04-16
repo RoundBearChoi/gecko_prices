@@ -174,7 +174,6 @@ def load_absolute_starts() -> Dict:
     try:
         with open(ABSOLUTE_STARTS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        # no need to print on successful load
         return data
     except Exception as e:
         print(f"\n   Could not load {ABSOLUTE_STARTS_FILE}: {e}")
@@ -539,28 +538,12 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     else:
         print("\n📊 Cumulative Loss Distribution: (No significant losses recorded yet)")
 
-    # ====================== HYPOTHETICAL EQUIVALENTS - TWO PARTS ======================
+    # ====================== HYPOTHETICAL EQUIVALENTS (Absolute Baseline only) ======================
     print("\n🔄 Hypothetical Equivalents (USD base):")
 
-    # 1. vs CSV Start → now shows the baseline equivalents + date (exactly like Absolute Baseline)
-    base_col1 = f"{a1['col_prefix']}_equivalent"
-    base_col2 = f"{a2['col_prefix']}_equivalent"
-    base1, base2 = get_first_equivalents(portfolio["csv_filename"], base_col1, base_col2)
-
-    print(f"   vs CSV Start →")
-    for asset, current_equiv, base_equiv, current_price in [
-        (a1, equiv1, base1, price1),
-        (a2, equiv2, base2, price2)
-    ]:
-        delta = current_equiv - base_equiv
-        delta_usd = delta * current_price
-        print(f"      {asset['symbol']} equivalent : {current_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
-        print(f"         Base : {base_equiv:,.{asset['balance_prec']}f} on {start_date}")
-        print(f"         Δ    : {delta:+,.{asset['balance_prec']}f} | ${delta_usd:+,.2f}")
-
-    # 2. vs Absolute Baseline (JSON) - unchanged (already perfect)
+    # vs Absolute Baseline (JSON)
     absolute_starts = load_absolute_starts()
-    print(f"\n   vs Absolute Baseline (JSON) →")
+    print(f"   vs Absolute Baseline (JSON) →")
     for asset, current_equiv, current_price in [(a1, equiv1, price1), (a2, equiv2, price2)]:
         prefix = asset["col_prefix"]
         base_data = absolute_starts.get(prefix, {})
