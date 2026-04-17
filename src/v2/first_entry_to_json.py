@@ -10,64 +10,44 @@ getcontext().prec = 36
 ABSOLUTE_STARTS_FILE = "absolute_starts.json"
 
 PORTFOLIOS = {
-    "1": {  # SOL + ORCA (Solana)
+    "1": {  # SOL + ORCA
         "name": "SOL + ORCA (Solana)",
         "csv_filename": "solana_orca_balances.csv",
         "json_key": "sol_orca",
-        "asset1_field": "sol_balance",
-        "asset1_name": "sol",
-        "asset2_field": "orca_balance",
-        "asset2_name": "orca",
-        "total_field": "total_value_usd",
         "date_field": "readable_time_kst"
     },
-    "2": {  # BTCB + PEPE (BSC)
+    "2": {  # BTCB + PEPE
         "name": "BTCB + PEPE (BSC)",
         "csv_filename": "btcb_pepe_balances.csv",
         "json_key": "btcb_pepe",
-        "asset1_field": "btcb_balance",
-        "asset1_name": "btcb",
-        "asset2_field": "pepe_balance",
-        "asset2_name": "pepe",
-        "total_field": "total_value_usd",
         "date_field": "readable_time_kst"
     }
 }
 
 def load_json() -> dict:
-    """Load existing absolute_starts.json or return empty dict if missing/corrupt."""
+    """Load existing absolute_starts.json or return empty dict."""
     if os.path.isfile(ABSOLUTE_STARTS_FILE):
         try:
             with open(ABSOLUTE_STARTS_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception as e:
-            print(f"   ⚠️  Could not load existing {ABSOLUTE_STARTS_FILE} ({e}). Starting fresh.")
+        except Exception:
             return {}
     return {}
 
 def save_json(data: dict):
-    """Save updated JSON with clean formatting (4-space indent, no trailing commas)."""
+    """Save with clean formatting."""
     with open(ABSOLUTE_STARTS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
     print(f"\n✅ {ABSOLUTE_STARTS_FILE} updated successfully!")
 
-
 def main():
-    print("=== first_entry_to_json.py ===")
-    print("This script reads the **very first data row** from the selected CSV")
-    print("and writes it as the new absolute baseline in absolute_starts.json.\n")
-    print("It will:")
-    print("   • Preserve any other pairs that already exist in the JSON")
-    print("   • Overwrite only the selected pair")
-    print("   • Use full precision from the CSV (via Decimal)")
-    print("   • Store date exactly as shown in your existing JSON format\n")
+    print("=== first_entry_to_json.py (Per-Token Absolute Baseline) ===")
+    print("This script sets the absolute baseline for ONE specific token at a time.\n")
 
-    # Show available pairs
     for k, v in PORTFOLIOS.items():
         print(f"[{k}] {v['name']}")
 
-    choice = input("\nSelect pair to set as absolute start (1 or 2): ").strip()
-
+    choice = input("\nSelect pair (1 or 2): ").strip()
     if choice not in PORTFOLIOS:
         print("❌ Invalid choice.")
         return
@@ -75,58 +55,68 @@ def main():
     config = PORTFOLIOS[choice]
     csv_file = config["csv_filename"]
 
-    # === CSV CHECK ===
     if not os.path.isfile(csv_file):
         print(f"❌ CSV file not found: {csv_file}")
-        print("   You must run monitor_pairs.py at least once to generate the CSV.")
+        print("   Run monitor_pairs.py first to generate data.")
         return
 
-    # === READ FIRST ROW ===
+    # === Choose which token ===
+    print(f"\nWhich token to set baseline for in {config['name']}?")
+    print("   1) SOL" if choice == "1" else "   1) BTCB")
+    print("   2) ORCA" if choice == "1" else "   2) PEPE")
+    token_choice = input("\nEnter choice (1 or 2): ").strip()
+
+    token_map = {
+        "1": ("sol", "sol_equivalent") if choice == "1" else ("btcb", "btcb_equivalent"),
+        "2": ("orca", "orca_equivalent") if choice == "1" else ("pepe", "pepe_equivalent")
+    }
+
+    if token_choice not in token_map:
+        print("❌ Invalid token choice.")
+        return
+
+    token_name, equiv_field = token_map[token_choice]
+    display_name = token_name.upper()
+
+    # === Read first row of CSV ===
     try:
         with open(csv_file, "r", newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            first_row = next(reader, None)   # Skip header automatically, get row 1
+            first_row = next(reader, None)
 
         if not first_row:
-            print("❌ CSV file contains no data rows.")
+            print("❌ CSV contains no data rows.")
             return
     except Exception as e:
         print(f"❌ Error reading CSV: {e}")
         return
 
-    # === EXTRACT VALUES WITH HIGH PRECISION ===
     try:
-        # Use Decimal to preserve every digit from CSV, then convert for JSON
+        equiv_value = Decimal(first_row[equiv_field])
+        date_kst = first_row.get(config["date_field"], "Unknown date")
+
         entry = {
-            "date_kst": first_row.get(config["date_field"], "Unknown date"),
-            config["asset1_name"]: float(Decimal(first_row[config["asset1_field"]])),
-            config["asset2_name"]: float(Decimal(first_row[config["asset2_field"]])),
-            "total_usd": float(Decimal(first_row[config["total_field"]])),
+            "date_kst": date_kst,
+            "equivalent": float(equiv_value)   # JSON-compatible
         }
 
-        # Load current JSON (or empty) and update only this pair
         data = load_json()
-        data[config["json_key"]] = entry
+        if config["json_key"] not in data:
+            data[config["json_key"]] = {}
 
-        # Save
+        data[config["json_key"]][token_name] = entry
         save_json(data)
 
-        # === CONFIRMATION OUTPUT ===
-        print(f"\n📍 New absolute baseline for {config['name']}")
-        print(f"   Date (KST) : {entry['date_kst']}")
-        print(f"   Total USD  : ${entry['total_usd']:,.2f}")
-        print(f"   {config['asset1_name'].upper():4} : {entry[config['asset1_name']]:,.8f}")
-        print(f"   {config['asset2_name'].upper():4} : {entry[config['asset2_name']]:,.8f}")
+        print(f"\n📍 New absolute baseline set for {display_name}")
+        print(f"   Date (KST) : {date_kst}")
+        print(f"   Equivalent : {equiv_value:,.8f} {display_name}")
 
-        print("\n💡 You can now run monitor_pairs.py — the new baseline will appear")
-        print("   in the 'Hypothetical Equivalents' section for future comparisons.")
+        print("\n💡 You can now run this script again for the other token (different date is allowed).")
 
     except KeyError as e:
         print(f"❌ Missing column in CSV: {e}")
-        print("   Make sure the CSV was generated by monitor_pairs.py")
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
-
 
 if __name__ == "__main__":
     main()

@@ -454,39 +454,35 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     last_change_info = get_minutes_since_last_balance_change(portfolio["csv_filename"], chg_col1, chg_col2)
     print(f"   Last balance change: {last_change_info}")
 
-    # ====================== HYPOTHETICAL EQUIVALENTS ======================
+    # ====================== HYPOTHETICAL EQUIVALENTS (PER TOKEN — UPDATED) ======================
     print("\n🔄 Hypothetical Equivalents (USD base):")
     absolute_starts = load_absolute_starts()
     pair_key = portfolio.get("absolute_key")
     pair_data = absolute_starts.get(pair_key, {}) if pair_key else {}
 
-    if pair_data and "date_kst" in pair_data:
-        base_date = pair_data["date_kst"]
-        print(f"   Baseline date : {base_date} (KST)")
+    if pair_data:
+        for asset in [a1, a2]:
+            prefix = asset["col_prefix"]          # "sol", "orca", "btcb", "pepe"
+            asset_baseline = pair_data.get(prefix)
 
-        for asset, current_equiv, current_price in [(a1, equiv1, price1), (a2, equiv2, price2)]:
-            prefix = asset["col_prefix"]
-            if prefix in pair_data:
-                base_equiv = Decimal(str(pair_data[prefix]))
+            print(f"\n   {asset['symbol']} equivalent:")
+            if isinstance(asset_baseline, dict) and "date_kst" in asset_baseline and "equivalent" in asset_baseline:
+                base_date = asset_baseline["date_kst"]
+                base_equiv = Decimal(str(asset_baseline["equivalent"]))
+
+                current_equiv = equiv1 if prefix == a1["col_prefix"] else equiv2
+                current_price = price1 if prefix == a1["col_prefix"] else price2
+
                 delta_abs = current_equiv - base_equiv
                 delta_usd = delta_abs * current_price
-                print(f"   {asset['symbol']} equivalent : {current_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
-                print(f"   Base          : {base_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
-                print(f"   Δ             : {delta_abs:+,.{asset['balance_prec']}f} | ${delta_usd:+,.2f}")
-            else:
-                print(f"      {asset['symbol']}: No baseline found under pair key '{pair_key}'")
 
-        if "total_usd" in pair_data:
-            base_total = Decimal(str(pair_data["total_usd"]))
-            delta_total_usd = total_usd - base_total
-            pct = (delta_total_usd / base_total * Decimal('100')) if base_total > 0 else Decimal('0')
-            pct_str = f" ({pct:+.2f}%)" if base_total > 0 else ""
-            print("\n📈 Total Portfolio (USD):")
-            print(f"   Current    : ${total_usd:,.2f}")
-            print(f"   Baseline   : ${base_total:,.2f}")
-            print(f"   Change     : ${delta_total_usd:+,.2f}{pct_str}")
+                print(f"      Current    : {current_equiv:,.{asset['balance_prec']}f} {asset['symbol']}")
+                print(f"      Baseline   : {base_equiv:,.{asset['balance_prec']}f} {asset['symbol']} ({base_date})")
+                print(f"      Δ          : {delta_abs:+,.{asset['balance_prec']}f} | ${delta_usd:+,.2f}")
+            else:
+                print(f"      No baseline set yet for this token")
     else:
-        print(f"   No absolute baseline set for this pair ('{pair_key}') in {ABSOLUTE_STARTS_FILE}")
+        print(f"   No absolute baselines configured for pair '{pair_key}' in {ABSOLUTE_STARTS_FILE}")
 
     print("\n💰 Current Prices:")
     print(f"   {a1['symbol']} = ${price1:,.{a1['price_prec']}f}")
