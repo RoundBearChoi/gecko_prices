@@ -41,7 +41,7 @@ def save_json(data: dict):
     print(f"\n✅ {ABSOLUTE_STARTS_FILE} updated successfully!")
 
 def main():
-    print("=== first_entry_to_json.py (Per-Token Absolute Baseline) ===")
+    print("=== entry_to_json.py (First or Last Entry as Absolute Baseline) ===")
     print("This script sets the absolute baseline for ONE specific token at a time.\n")
 
     for k, v in PORTFOLIOS.items():
@@ -78,22 +78,48 @@ def main():
     token_name, equiv_field = token_map[token_choice]
     display_name = token_name.upper()
 
-    # === Read first row of CSV ===
+    # === Read CSV to show options (prompt now truly at the "end") ===
     try:
         with open(csv_file, "r", newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            first_row = next(reader, None)
+            rows = list(reader)
 
-        if not first_row:
+        if not rows:
             print("❌ CSV contains no data rows.")
             return
+
+        first_row = rows[0]
+        last_row = rows[-1]
+
+        print(f"\n📅 Available entries in {csv_file}:")
+        print(f"   First entry: {first_row.get(config['date_field'], 'Unknown')}")
+        print(f"   Last entry : {last_row.get(config['date_field'], 'Unknown')}")
+
     except Exception as e:
         print(f"❌ Error reading CSV: {e}")
         return
 
+    # === Prompt at the end for first or last entry ===
+    print("\nWhich entry do you want to save as the absolute baseline?")
+    print("   F) First entry (earliest - recommended for true baseline)")
+    print("   L) Last entry  (most recent)")
+    entry_choice = input("\nEnter choice (F or L): ").strip().upper()
+
+    if entry_choice not in ['F', 'L']:
+        print("❌ Invalid choice.")
+        return
+
+    if entry_choice == 'F':
+        selected_row = first_row
+        entry_type = "first"
+    else:
+        selected_row = last_row
+        entry_type = "last"
+
+    # === Process selected row ===
     try:
-        equiv_value = Decimal(first_row[equiv_field])
-        date_kst = first_row.get(config["date_field"], "Unknown date")
+        equiv_value = Decimal(selected_row[equiv_field])
+        date_kst = selected_row.get(config["date_field"], "Unknown date")
 
         entry = {
             "date_kst": date_kst,
@@ -107,11 +133,11 @@ def main():
         data[config["json_key"]][token_name] = entry
         save_json(data)
 
-        print(f"\n📍 New absolute baseline set for {display_name}")
+        print(f"\n📍 New absolute baseline set for {display_name} using the {entry_type} entry")
         print(f"   Date (KST) : {date_kst}")
         print(f"   Equivalent : {equiv_value:,.8f} {display_name}")
 
-        print("\n💡 You can now run this script again for the other token (different date is allowed).")
+        print("\n💡 You can now run this script again for the other token (different entry type/date is allowed).")
 
     except KeyError as e:
         print(f"❌ Missing column in CSV: {e}")

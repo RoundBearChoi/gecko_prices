@@ -28,6 +28,9 @@ BASE_CONFIG = {
     "PRICE_CACHE_SECONDS": 10,
 }
 
+# ========================= SLIPPAGE CONFIG =========================
+SLIPPAGE = Decimal("0.015")  # 1.5% slippage assumption for realistic DEX swaps
+
 ABSOLUTE_STARTS_FILE = "absolute_starts.json"
 
 # ====================== GLOBAL PRICE CACHE ======================
@@ -315,7 +318,7 @@ def get_erc20_balance(w3: Web3, address: str, token_contract: str) -> Decimal:
     decimals = contract.functions.decimals().call()
     return Decimal(raw) / Decimal(10 ** decimals)
 
-# ====================== PORTFOLIO BAR (NOW FULLY DECIMAL — ZERO FLOAT) ======================
+# ====================== PORTFOLIO BAR (NOW WITH 1.5% SLIPPAGE) ======================
 def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: Decimal, bal1: Decimal, bal2: Decimal,
                         price1: Decimal, price2: Decimal, bar_char1: str, bar_char2: str):
     ratio2 = Decimal('1') - ratio1
@@ -343,14 +346,21 @@ def print_portfolio_bar(asset1_sym: str, asset2_sym: str, ratio1: Decimal, bal1:
     if total_usd > 1:
         target = total_usd / 2
         excess = (bal1 * price1) - target
+
         if excess >= 0:
+            # Too much asset1 → sell some asset1 to buy asset2
             sell1 = excess / price1
-            buy2 = excess / price2
-            print(f"   To 50:50 → Sell ~{sell1:.6f} {asset1_sym} (~${excess:.2f} USD) to buy ~{buy2:.4f} {asset2_sym}")
+            usd_after_slippage = excess * (Decimal('1') - SLIPPAGE)
+            buy2 = usd_after_slippage / price2
+            print(f"   To 50:50 → Sell ~{sell1:.6f} {asset1_sym} (~${excess:.2f} USD) "
+                  f"→ buy ~{buy2:.4f} {asset2_sym} (after {SLIPPAGE*100:.1f}% slippage)")
         else:
+            # Too much asset2 → sell some asset2 to buy asset1
             sell2 = abs(excess) / price2
-            buy1 = abs(excess) / price1
-            print(f"   To 50:50 → Sell ~{sell2:.4f} {asset2_sym} (~${abs(excess):.2f} USD) to buy ~{buy1:.6f} {asset1_sym}")
+            usd_after_slippage = abs(excess) * (Decimal('1') - SLIPPAGE)
+            buy1 = usd_after_slippage / price1
+            print(f"   To 50:50 → Sell ~{sell2:.4f} {asset2_sym} (~${abs(excess):.2f} USD) "
+                  f"→ buy ~{buy1:.6f} {asset1_sym} (after {SLIPPAGE*100:.1f}% slippage)")
     else:
         print("   ⚠️  Portfolio value too small for rebalancing suggestion")
 
@@ -454,15 +464,15 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
     last_change_info = get_minutes_since_last_balance_change(portfolio["csv_filename"], chg_col1, chg_col2)
     print(f"   Last balance change: {last_change_info}")
 
-    # ====================== HYPOTHETICAL EQUIVALENTS (PER TOKEN — UPDATED) ======================
-    print("\n🔄 Hypothetical Equivalents (USD base):")
+    # ====================== HYPOTHETICAL EQUIVALENTS (WITH 1.5% SLIPPAGE ON CROSS-ASSET) ======================
+    print(f"\n🔄 Hypothetical Equivalents (USD base — after {SLIPPAGE*100:.1f}% slippage on cross-asset):")
     absolute_starts = load_absolute_starts()
     pair_key = portfolio.get("absolute_key")
     pair_data = absolute_starts.get(pair_key, {}) if pair_key else {}
 
     if pair_data:
         for asset in [a1, a2]:
-            prefix = asset["col_prefix"]          # "sol", "orca", "btcb", "pepe"
+            prefix = asset["col_prefix"]
             asset_baseline = pair_data.get(prefix)
 
             print(f"\n   {asset['symbol']} equivalent:")
@@ -470,8 +480,19 @@ def fetch_and_display(portfolio: dict, address: str, w3: Web3 = None, save_to_cs
                 base_date = asset_baseline["date_kst"]
                 base_equiv = Decimal(str(asset_baseline["equivalent"]))
 
-                current_equiv = equiv1 if prefix == a1["col_prefix"] else equiv2
-                current_price = price1 if prefix == a1["col_prefix"] else price2
+                # Current values
+                if prefix == a1["col_prefix"]:
+                    own_bal = bal1
+                    other_val = val2
+                    current_price = price1
+                else:
+                    own_bal = bal2
+                    other_val = val1
+                    current_price = price2
+
+                # Apply slippage ONLY to the portion that would be swapped
+                other_equiv_after_slip = (other_val * (Decimal('1') - SLIPPAGE)) / current_price
+                current_equiv = own_bal + other_equiv_after_slip
 
                 delta_abs = current_equiv - base_equiv
                 delta_usd = delta_abs * current_price
