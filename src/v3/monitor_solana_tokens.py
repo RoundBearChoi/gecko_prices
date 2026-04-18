@@ -373,7 +373,6 @@ def main():
     print(f"   Total portfolio value: ${total_usd:,.8f} USD")
     print(f"   Time (KST): {timestamp_str}")
     print(f"   Tokens tracked: {len(portfolio)} / {len(tokens)}")
-    print("\nTip: Run this script anytime you want a fresh snapshot. Edit tokens_list.json to add/remove coins.")
 
 
 if __name__ == "__main__":
