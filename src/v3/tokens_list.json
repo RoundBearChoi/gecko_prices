@@ -18,5 +18,20 @@
     "symbol": "USELESS",
     "id": "useless-3",
     "mint": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk"
+  },
+  {
+    "symbol": "ETH",
+    "id": "ethereum-wormhole",
+    "mint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs"
+  },
+  {
+    "symbol": "SOL",
+    "id": "solana",
+    "mint": "NATIVE"
+  },
+  {
+    "symbol": "CBBTC",
+    "id": "coinbase-wrapped-btc",
+    "mint": "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij"
   }
 ]

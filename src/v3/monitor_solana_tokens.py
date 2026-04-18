@@ -109,6 +109,26 @@ def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
     return token_data
 
 
+def get_native_sol_balance(wallet_address: str) -> Decimal:
+    """Fetch native SOL balance via getBalance RPC (in full SOL units, not lamports)."""
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getBalance",
+        "params": [wallet_address]
+    }
+    response = requests.post(CONFIG["RPC_URL"], json=payload, timeout=20)
+    response.raise_for_status()
+    result = response.json()
+
+    if "error" in result:
+        raise Exception(f"Solana RPC error (getBalance): {result['error']}")
+
+    lamports = result.get("result", {}).get("value", 0)
+    # SOL has exactly 9 decimals
+    return Decimal(lamports) / Decimal("1000000000")
+
+
 def get_prices(gecko_ids: list[str]) -> dict[str, Decimal]:
     """Batch fetch current USD prices from CoinGecko."""
     if not gecko_ids:
@@ -186,34 +206,39 @@ def main():
     print("\nFetching USD prices from CoinGecko (free tier)...")
     prices = get_prices(gecko_ids)
 
-    # 3. Fetch precise token balances
+    # 3. Fetch precise token balances + native SOL
     print("Fetching token balances from Solana RPC...")
     try:
         token_accounts = get_all_token_accounts(wallet)
+        native_sol_balance = get_native_sol_balance(wallet)
     except Exception as e:
         print(f"RPC error: {e}")
         print("Tip: Public RPCs are rate-limited. Consider a free Helius.dev or Ankr RPC key in CONFIG.")
         return
 
-    # 4. Build portfolio with full Decimal math
+    # 4. Build portfolio with full Decimal math (now includes native SOL)
     portfolio = []
     total_usd = Decimal("0")
 
     for token in tokens:
         gid = token["id"]
-        mint = token["mint"]
+        mint = token.get("mint")          # use .get() for safety
         symbol = token["symbol"]
 
         price = prices.get(gid, Decimal("0"))
 
-        # Get balance (0 if not held)
-        if mint in token_accounts:
-            info = token_accounts[mint]
-            raw = Decimal(info["raw_amount"])
-            dec = info["decimals"]
-            balance = raw / (Decimal(10) ** dec)
+        # === SPECIAL HANDLING FOR NATIVE SOL ===
+        if mint == "NATIVE":
+            balance = native_sol_balance
         else:
-            balance = Decimal("0")
+            # Normal SPL token handling
+            if mint in token_accounts:
+                info = token_accounts[mint]
+                raw = Decimal(info["raw_amount"])
+                dec = info["decimals"]
+                balance = raw / (Decimal(10) ** dec)
+            else:
+                balance = Decimal("0")
 
         value_usd = balance * price
         total_usd += value_usd
@@ -221,7 +246,7 @@ def main():
         portfolio.append({
             "gecko_id": gid,
             "symbol": symbol,
-            "mint": mint,
+            "mint": mint if mint != "NATIVE" else "NATIVE_SOL",  # clean CSV display
             "balance": balance,
             "price_usd": price,
             "value_usd": value_usd,
