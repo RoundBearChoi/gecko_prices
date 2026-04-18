@@ -12,10 +12,10 @@ from pathlib import Path
 CONFIG = {
     "RPC_URL": "https://api.mainnet-beta.solana.com",          # Public RPC (rate-limited). Replace with Helius/QuickNode/Ankr for production use
     "COINGECKO_BASE": "https://api.coingecko.com/api/v3",
-    "TOKENS_FILE": "tokens_list.json",                         # NEW: JSON file with symbol, id, mint for each token
+    "TOKENS_FILE": "tokens_list.json",                         # JSON file with symbol, id, mint for each token
     "KST_TZ": "Asia/Seoul",
     "DECIMAL_PRECISION": 50,                                   # Very high precision for all calculations
-    "CSV_OUTPUT_DIR": Path("wallet_data"),                     # NEW: All CSVs now saved here (folder auto-created)
+    "CSV_OUTPUT_DIR": Path("wallet_data"),                     # All CSVs saved here (folder auto-created)
     "CSV_FILENAME_TEMPLATE": "solana_meme_portfolio_{timestamp}.csv",
     "INCLUDE_MINT_IN_CSV": True,                               # Extra column with Solana mint address (helpful for verification)
 }
@@ -51,7 +51,7 @@ def load_tokens() -> list[dict]:
     
     except FileNotFoundError:
         print(f"Error: {CONFIG['TOKENS_FILE']} not found.")
-        print("→ Please create it in the same folder as this script using the JSON I provided below.")
+        print("→ Please create it in the same folder as this script using the JSON I provided in the previous message.")
         sys.exit(1)
     except json.JSONDecodeError as e:
         print(f"Error: Invalid JSON in {CONFIG['TOKENS_FILE']}: {e}")
@@ -212,12 +212,13 @@ def main():
     filename_ts = kst_now.strftime("%Y%m%d_%H%M%S")
 
     # 7. CSV output → wallet_data/ folder (tokens first, TOTAL at the very bottom)
+    #     wallet_address column has been completely removed as requested
     csv_dir = Path(CONFIG["CSV_OUTPUT_DIR"])
     csv_dir.mkdir(parents=True, exist_ok=True)
     csv_path = csv_dir / CONFIG["CSV_FILENAME_TEMPLATE"].format(timestamp=filename_ts)
 
     fieldnames = [
-        "timestamp_kst", "wallet_address", "total_usd",
+        "timestamp_kst", "total_usd",
         "gecko_id", "symbol", "mint", "token_count",
         "price_usd", "value_usd", "portfolio_percent", "equivalent_tokens_if_all_swapped"
     ]
@@ -230,7 +231,6 @@ def main():
         for item in portfolio:
             writer.writerow({
                 "timestamp_kst": timestamp_str,
-                "wallet_address": wallet,
                 "total_usd": str(total_usd),
                 "gecko_id": item["gecko_id"],
                 "symbol": item["symbol"],
@@ -245,7 +245,6 @@ def main():
         # TOTAL row at the bottom (as requested)
         writer.writerow({
             "timestamp_kst": timestamp_str,
-            "wallet_address": wallet,
             "total_usd": str(total_usd),
             "gecko_id": "TOTAL",
             "symbol": "",
