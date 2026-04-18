@@ -312,8 +312,8 @@ def main():
     # ====================== 📈 EQUIVALENT TOKENS COMPARISON (Portfolio Buying Power) ======================
     print("\n=== 📈 Starting Equivalent Tokens Comparison ===")
     print("   (How many tokens of each your FULL portfolio could buy right now - slippage adjusted)")
-    print(f"{'Symbol':>12} | {'Current Equiv':>22} | {'Starting Equiv':>22} | {'Delta Equiv':>22} | {'% Change':>12}")
-    print("-" * 98)
+    print(f"{'Symbol':>12} | {'Current Equiv':>22} | {'Starting Equiv':>22} | {'Delta Equiv':>22} | {'Delta USD':>19} | {'% Change':>12}")
+    print("-" * 120)
     
     has_starting_data = False
     for item in sorted_portfolio:
@@ -323,9 +323,19 @@ def main():
             current = item["equivalent"]
             starting = snapshot["equivalent"]
             delta = current - starting
+            
+            # NEW: USD value of the equiv delta (using current price)
+            # Pure Decimal math — no float used in calculation
+            delta_usd = delta * item["price_usd"]
+            
+            if delta_usd != Decimal("0"):
+                delta_usd_str = f"${delta_usd:+,.2f}"
+            else:
+                delta_usd_str = "$0.00"
+            
             if starting > 0:
                 pct_change = (delta / starting) * Decimal("100")
-                pct_str = f"{float(pct_change):+.2f}%"
+                pct_str = f"{float(pct_change):+.2f}%"   # only for clean display formatting
             else:
                 pct_str = "N/A"
             
@@ -333,6 +343,7 @@ def main():
                   f"{current:>22,.8f} | "
                   f"{starting:>22,.8f} | "
                   f"{delta:>22,.8f} | "
+                  f"{delta_usd_str:>19} | "
                   f"{pct_str:>12}")
     
     if not has_starting_data:
@@ -353,8 +364,8 @@ def main():
         print("   ⚠️  NOTE: Starting snapshots were taken on DIFFERENT dates!")
         print("      → Price % changes are NOT directly comparable across tokens.")
     
-    print(f"{'Symbol':>12} | {'Current Price':>18} | {'Starting Price':>18} | {'Price Δ':>15} | {'% Change':>12} | {'Start Date':>12}")
-    print("-" * 108)
+    print(f"{'Symbol':>12} | {'Current Price':>19} | {'Starting Price':>19} | {'Price Δ':>17} | {'% Change':>12} | {'Start Date':>12}")
+    print("-" * 106)
     
     has_price_data = False
     for item in sorted_portfolio:
@@ -367,11 +378,17 @@ def main():
             pct_change = (delta_p / start_p) * Decimal("100")
             start_date = snapshot.get("starting_date", "N/A")
             
+            # Format full strings (including $) so they right-align cleanly
+            current_str = f"${current_p:,.6f}"
+            start_str = f"${start_p:,.6f}"
+            delta_str = f"${delta_p:,.6f}"
+            pct_str = f"{float(pct_change):+8.2f}%"
+            
             print(f"{item['symbol']:>12} | "
-                  f"${current_p:>16,.6f} | "
-                  f"${start_p:>16,.6f} | "
-                  f"${delta_p:>13,.6f} | "
-                  f"{float(pct_change):+8.2f}% | "
+                  f"{current_str:>19} | "
+                  f"{start_str:>19} | "
+                  f"{delta_str:>17} | "
+                  f"{pct_str:>12} | "
                   f"{start_date:>12}")
     
     if not has_price_data:
