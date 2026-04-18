@@ -8,16 +8,15 @@ import sys
 from pathlib import Path
 
 # ==================== CONFIG SECTION ====================
-# Change these variables as needed. Everything else is handled automatically.
 CONFIG = {
     "RPC_URL": "https://api.mainnet-beta.solana.com",          # Public RPC (rate-limited). Replace with Helius/QuickNode/Ankr for production use
     "COINGECKO_BASE": "https://api.coingecko.com/api/v3",
     "TOKENS_FILE": "tokens_list.json",                         # JSON file with symbol, id, mint for each token
     "KST_TZ": "Asia/Seoul",
     "DECIMAL_PRECISION": 50,                                   # Very high precision for all calculations
-    "CSV_OUTPUT_DIR": Path("wallet_data"),                     # All CSVs saved here (folder auto-created)
+    "CSV_OUTPUT_DIR": Path("wallet_data"),
     "CSV_FILENAME_TEMPLATE": "solana_meme_portfolio_{timestamp}.csv",
-    "INCLUDE_MINT_IN_CSV": True,                               # Extra column with Solana mint address (helpful for verification)
+    "INCLUDE_MINT_IN_CSV": True,
 }
 
 # Set global Decimal precision once (affects all Decimal operations)
@@ -139,7 +138,7 @@ def get_prices(gecko_ids: list[str]) -> dict[str, Decimal]:
 
 def main():
     print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC) ===\n")
-    wallet = input("Enter your Solana wallet address (e.g. 5... or 9...): ").strip()
+    wallet = input("Enter your Solana wallet address: ").strip()
     if not wallet:
         print("No wallet address provided. Exiting.")
         return
