@@ -133,6 +133,26 @@ def get_prices(gecko_ids: list[str]) -> dict[str, Decimal]:
     return prices
 
 
+def get_starting_token_count(gecko_id: str) -> Decimal | None:
+    """Load the *latest* 'token_count' from {gecko_id}_starting_points.csv (your manual starting snapshots)."""
+    filename = f"{gecko_id}_starting_points.csv"
+    path = Path(filename)
+    if not path.exists():
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            reader = list(csv.DictReader(f))
+            if not reader:
+                return None
+            # Latest row = most recent starting snapshot
+            last_row = reader[-1]
+            token_count_str = last_row.get("token_count", "0").strip() or "0"
+            return Decimal(token_count_str)
+    except Exception as e:
+        print(f"Warning: Failed to load starting points for {gecko_id} from {filename}: {e}")
+        return None
+
+
 def main():
     print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC + Equal Rebalance + Slippage) ===\n")
     wallet = input("Enter your Solana wallet address: ").strip()
@@ -271,6 +291,33 @@ def main():
     else:
         print("Portfolio value is $0.00 — nothing to break down.")
 
+    # ====================== 📈 STARTING TOKEN COUNT COMPARISON ======================
+    print("\n=== 📈 Starting Token Count Comparison ===")
+    print(f"{'Symbol':>12} | {'Current Tokens':>20} | {'Starting Tokens':>20} | {'Delta Tokens':>20} | {'% Change':>12}")
+    print("-" * 88)
+    
+    has_starting_data = False
+    for item in sorted(portfolio, key=lambda x: x["value_usd"], reverse=True):
+        starting = get_starting_token_count(item["gecko_id"])
+        if starting is not None:
+            has_starting_data = True
+            current = item["balance"]
+            delta = current - starting
+            if starting > 0:
+                pct_change = (delta / starting) * Decimal("100")
+                pct_str = f"{float(pct_change):+.2f}%"
+            else:
+                pct_str = "N/A"
+            
+            print(f"{item['symbol']:>12} | "
+                  f"{current:>20,.8f} | "
+                  f"{starting:>20,.8f} | "
+                  f"{delta:>20,.8f} | "
+                  f"{pct_str:>12}")
+    
+    if not has_starting_data:
+        print("No starting point CSV files found for tracked tokens.")
+
     # ====================== 🔄 EQUAL-WEIGHT REBALANCING SUGGESTION (NO HOLD, always show Tokens Δ) ======================
     print("\n=== 🔄 Suggested Rebalance to Equal % Allocation ===")
     
@@ -320,19 +367,6 @@ def main():
         print("-" * 92)
         print(f"💰 Total gross sell volume: ~${total_sell_usd_gross:,.4f} USD")
         print(f"   Expected after {SLIPPAGE_PCT}% slippage: ~${total_sell_usd_gross * SLIPPAGE_FACTOR:,.4f} USDT")
-        
-        if total_sell_usd_gross > 0:
-            usd_per_token_net = (total_sell_usd_gross * SLIPPAGE_FACTOR) / Decimal(n_held)
-            print(f"\n💡 Minimal-trade execution plan:")
-            print(f"   1. Sell the SELL amounts above → receive ~${total_sell_usd_gross * SLIPPAGE_FACTOR:,.4f} USDT (after slippage)")
-            print(f"   2. Split the USDT and buy the exact BUY amounts shown above")
-            print(f"      → Every position lands at exactly the equal-weight target")
-        
-        print("\n⚠️  Notes:")
-        print(f"   • Using {SLIPPAGE_PCT}% slippage assumption (configurable)")
-        print("   • Tokens Δ = exact amount to buy (+) or sell (-) at current price")
-        print("   • All held tokens are shown (even tiny deltas)")
-        print("   • Re-run script right before trading — prices move fast")
 
     # Final console summary
     print(f"\n✅ Portfolio snapshot saved to: {csv_path}")
