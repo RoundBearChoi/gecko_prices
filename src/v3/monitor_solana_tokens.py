@@ -133,8 +133,8 @@ def get_prices(gecko_ids: list[str]) -> dict[str, Decimal]:
     return prices
 
 
-def get_starting_token_count(gecko_id: str) -> Decimal | None:
-    """Load the *latest* 'token_count' from {gecko_id}_starting_points.csv (your manual starting snapshots)."""
+def get_starting_snapshot(gecko_id: str) -> dict | None:
+    """Load the *latest* starting snapshot (equivalent + price + date) from {gecko_id}_starting_points.csv."""
     filename = f"{gecko_id}_starting_points.csv"
     path = Path(filename)
     if not path.exists():
@@ -146,10 +146,28 @@ def get_starting_token_count(gecko_id: str) -> Decimal | None:
                 return None
             # Latest row = most recent starting snapshot
             last_row = reader[-1]
-            token_count_str = last_row.get("token_count", "0").strip() or "0"
-            return Decimal(token_count_str)
+            
+            equiv_str = last_row.get("equivalent_tokens_if_all_swapped", "0").strip() or "0"
+            price_str = last_row.get("price_usd", "").strip()
+            timestamp_str = last_row.get("timestamp_kst", "").strip()
+            
+            # Extract date only (YYYY-MM-DD) — ignore time & timezone
+            starting_date = timestamp_str.split()[0] if timestamp_str else "N/A"
+            
+            data = {
+                "equivalent": Decimal(equiv_str),
+                "starting_date": starting_date
+            }
+            if price_str:
+                try:
+                    data["starting_price"] = Decimal(price_str)
+                except Exception:
+                    data["starting_price"] = None
+            else:
+                data["starting_price"] = None
+            return data
     except Exception as e:
-        print(f"Warning: Failed to load starting points for {gecko_id} from {filename}: {e}")
+        print(f"Warning: Failed to load starting snapshot for {gecko_id} from {filename}: {e}")
         return None
 
 
@@ -291,17 +309,19 @@ def main():
     else:
         print("Portfolio value is $0.00 — nothing to break down.")
 
-    # ====================== 📈 STARTING TOKEN COUNT COMPARISON ======================
-    print("\n=== 📈 Starting Token Count Comparison ===")
-    print(f"{'Symbol':>12} | {'Current Tokens':>20} | {'Starting Tokens':>20} | {'Delta Tokens':>20} | {'% Change':>12}")
-    print("-" * 88)
+    # ====================== 📈 EQUIVALENT TOKENS COMPARISON (Portfolio Buying Power) ======================
+    print("\n=== 📈 Starting Equivalent Tokens Comparison ===")
+    print("   (How many tokens of each your FULL portfolio could buy right now - slippage adjusted)")
+    print(f"{'Symbol':>12} | {'Current Equiv':>22} | {'Starting Equiv':>22} | {'Delta Equiv':>22} | {'% Change':>12}")
+    print("-" * 98)
     
     has_starting_data = False
-    for item in sorted(portfolio, key=lambda x: x["value_usd"], reverse=True):
-        starting = get_starting_token_count(item["gecko_id"])
-        if starting is not None:
+    for item in sorted_portfolio:
+        snapshot = get_starting_snapshot(item["gecko_id"])
+        if snapshot is not None:
             has_starting_data = True
-            current = item["balance"]
+            current = item["equivalent"]
+            starting = snapshot["equivalent"]
             delta = current - starting
             if starting > 0:
                 pct_change = (delta / starting) * Decimal("100")
@@ -310,13 +330,54 @@ def main():
                 pct_str = "N/A"
             
             print(f"{item['symbol']:>12} | "
-                  f"{current:>20,.8f} | "
-                  f"{starting:>20,.8f} | "
-                  f"{delta:>20,.8f} | "
+                  f"{current:>22,.8f} | "
+                  f"{starting:>22,.8f} | "
+                  f"{delta:>22,.8f} | "
                   f"{pct_str:>12}")
     
     if not has_starting_data:
         print("No starting point CSV files found for tracked tokens.")
+        print("   → Create {gecko_id}_starting_points.csv with 'equivalent_tokens_if_all_swapped' column")
+
+    # ====================== 📉 PRICE PERFORMANCE VS STARTING POINT (with extracted date) ======================
+    print("\n=== 📉 Price Performance vs Starting Point ===")
+    print("   (Individual token price change since the starting snapshot)")
+    
+    # Quick check for date consistency (nuance detection)
+    dates_seen = set()
+    for item in portfolio:
+        snapshot = get_starting_snapshot(item["gecko_id"])
+        if snapshot and snapshot.get("starting_date") and snapshot.get("starting_date") != "N/A":
+            dates_seen.add(snapshot["starting_date"])
+    if len(dates_seen) > 1:
+        print("   ⚠️  NOTE: Starting snapshots were taken on DIFFERENT dates!")
+        print("      → Price % changes are NOT directly comparable across tokens.")
+    
+    print(f"{'Symbol':>12} | {'Current Price':>18} | {'Starting Price':>18} | {'Price Δ':>15} | {'% Change':>12} | {'Start Date':>12}")
+    print("-" * 108)
+    
+    has_price_data = False
+    for item in sorted_portfolio:
+        snapshot = get_starting_snapshot(item["gecko_id"])
+        if snapshot and snapshot.get("starting_price") is not None and snapshot["starting_price"] > Decimal("0"):
+            has_price_data = True
+            current_p = item["price_usd"]
+            start_p = snapshot["starting_price"]
+            delta_p = current_p - start_p
+            pct_change = (delta_p / start_p) * Decimal("100")
+            start_date = snapshot.get("starting_date", "N/A")
+            
+            print(f"{item['symbol']:>12} | "
+                  f"${current_p:>16,.6f} | "
+                  f"${start_p:>16,.6f} | "
+                  f"${delta_p:>13,.6f} | "
+                  f"{float(pct_change):+8.2f}% | "
+                  f"{start_date:>12}")
+    
+    if not has_price_data:
+        print("No starting price data found in the _starting_points.csv files.")
+        print("   → Add a 'price_usd' column (keep your existing 'timestamp_kst' column).")
+        print("   → The date will be automatically extracted from timestamp_kst.")
 
     # ====================== 🔄 EQUAL-WEIGHT REBALANCING SUGGESTION (NO HOLD, always show Tokens Δ) ======================
     print("\n=== 🔄 Suggested Rebalance to Equal % Allocation ===")
