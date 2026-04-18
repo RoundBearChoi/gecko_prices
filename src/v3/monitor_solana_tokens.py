@@ -17,10 +17,14 @@ CONFIG = {
     "CSV_OUTPUT_DIR": Path("wallet_data"),
     "CSV_FILENAME_TEMPLATE": "solana_meme_portfolio_{timestamp}.csv",
     "INCLUDE_MINT_IN_CSV": True,
+    "SLIPPAGE_PERCENT": 1.5,                                   # Assumed slippage % for realistic equivalent & rebalance calcs
 }
 
-# Set global Decimal precision once (affects all Decimal operations)
+# Set global Decimal precision + slippage
 getcontext().prec = CONFIG["DECIMAL_PRECISION"]
+SLIPPAGE_PCT = Decimal(str(CONFIG["SLIPPAGE_PERCENT"]))
+SLIPPAGE_FACTOR = Decimal("1") - (SLIPPAGE_PCT / Decimal("100"))
+print(f"Slippage assumption loaded: {SLIPPAGE_PCT}% → effective factor {SLIPPAGE_FACTOR}")
 
 # SPL Token program ID (standard for all Solana tokens)
 TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
@@ -130,7 +134,7 @@ def get_prices(gecko_ids: list[str]) -> dict[str, Decimal]:
 
 
 def main():
-    print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC) ===\n")
+    print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC + Equal Rebalance + Slippage) ===\n")
     wallet = input("Enter your Solana wallet address: ").strip()
     if not wallet:
         print("No wallet address provided. Exiting.")
@@ -185,11 +189,16 @@ def main():
             "value_usd": value_usd,
         })
 
-    # 5. Percentages and equivalent value
+    # 5. Percentages and equivalent value (slippage-adjusted)
     if total_usd > 0:
+        effective_total_after_slippage = total_usd * SLIPPAGE_FACTOR
         for item in portfolio:
             item["percent"] = (item["value_usd"] / total_usd) * Decimal("100")
-            item["equivalent"] = total_usd / item["price_usd"] if item["price_usd"] > 0 else Decimal("0")
+            item["equivalent"] = (
+                effective_total_after_slippage / item["price_usd"]
+                if item["price_usd"] > Decimal("0")
+                else Decimal("0")
+            )
     else:
         for item in portfolio:
             item["percent"] = Decimal("0")
@@ -200,7 +209,7 @@ def main():
     timestamp_str = kst_now.strftime("%Y-%m-%d %H:%M:%S KST")
     filename_ts = kst_now.strftime("%Y%m%d_%H%M%S")
 
-    # 7. CSV output (unchanged)
+    # 7. CSV output
     csv_dir = Path(CONFIG["CSV_OUTPUT_DIR"])
     csv_dir.mkdir(parents=True, exist_ok=True)
     csv_path = csv_dir / CONFIG["CSV_FILENAME_TEMPLATE"].format(timestamp=filename_ts)
@@ -243,10 +252,9 @@ def main():
             "equivalent_tokens_if_all_swapped": ""
         })
 
-    # ====================== NEW: CONSOLE PERCENTAGE BREAKDOWN ======================
+    # ====================== 📊 Portfolio Breakdown by USD Value ======================
     print("\n=== 📊 Portfolio Breakdown by USD Value ===")
     if total_usd > 0:
-        # Sort by value (highest first) and show only tokens you actually hold
         sorted_portfolio = sorted(portfolio, key=lambda x: x["value_usd"], reverse=True)
         held_tokens = [item for item in sorted_portfolio if item["balance"] > 0]
 
@@ -263,7 +271,70 @@ def main():
     else:
         print("Portfolio value is $0.00 — nothing to break down.")
 
-    # Final console summary (unchanged, no wallet address shown)
+    # ====================== 🔄 EQUAL-WEIGHT REBALANCING SUGGESTION (NO HOLD, always show Tokens Δ) ======================
+    print("\n=== 🔄 Suggested Rebalance to Equal % Allocation ===")
+    
+    held_tokens = [item for item in portfolio if item["balance"] > Decimal("0")]
+    n_held = len(held_tokens)
+    
+    if n_held < 2 or total_usd < Decimal("10"):
+        print("Need at least 2 held tokens and >$10 total value to suggest rebalancing.")
+    else:
+        target_usd = total_usd / Decimal(n_held)
+        target_pct = Decimal("100") / Decimal(n_held)
+        effective_target_usd = target_usd * SLIPPAGE_FACTOR
+        
+        print(f"📌 Rebalancing among {n_held} held tokens")
+        print(f"   Target per token (gross): ${target_usd:,.6f} USD  ({target_pct:.2f}% each)")
+        print(f"   After {SLIPPAGE_PCT}% slippage: effective ~${effective_target_usd:,.6f} USD deployable")
+        
+        print(f"\n{'Symbol':>12} | {'Current $':>14} | {'Current %':>9} | {'Action':>8} | {'USD Δ (gross)':>16} | {'Tokens Δ':>18}")
+        print("-" * 92)
+        
+        total_sell_usd_gross = Decimal("0")
+        actions = []
+        
+        for item in sorted(held_tokens, key=lambda x: x["value_usd"], reverse=True):
+            delta_usd = item["value_usd"] - target_usd
+            tokens_delta = delta_usd / item["price_usd"] if item["price_usd"] > Decimal("0") else Decimal("0")
+            
+            if delta_usd > Decimal("0"):          # SELL
+                action_str = "SELL"
+                usd_str = f"-${delta_usd:,.6f}"
+                token_delta_str = f"-{tokens_delta:,.8f}"
+                total_sell_usd_gross += delta_usd
+            elif delta_usd < Decimal("0"):        # BUY
+                action_str = "BUY "
+                usd_str = f"+${abs(delta_usd):,.6f}"
+                token_delta_str = f"+{abs(tokens_delta):,.8f}"
+            else:                                 # perfect zero (extremely rare)
+                action_str = " - "
+                usd_str = "$0.000000"
+                token_delta_str = "0.00000000"
+            
+            actions.append((item["symbol"], item["value_usd"], item["percent"], action_str, usd_str, token_delta_str))
+        
+        for sym, val, pct, act, usd_d, tok_d in actions:
+            print(f"{sym:>12} | ${val:>12,.4f} | {float(pct):>8.2f}% | {act:>8} | {usd_d:>16} | {tok_d:>18}")
+        
+        print("-" * 92)
+        print(f"💰 Total gross sell volume: ~${total_sell_usd_gross:,.4f} USD")
+        print(f"   Expected after {SLIPPAGE_PCT}% slippage: ~${total_sell_usd_gross * SLIPPAGE_FACTOR:,.4f} USDT")
+        
+        if total_sell_usd_gross > 0:
+            usd_per_token_net = (total_sell_usd_gross * SLIPPAGE_FACTOR) / Decimal(n_held)
+            print(f"\n💡 Minimal-trade execution plan:")
+            print(f"   1. Sell the SELL amounts above → receive ~${total_sell_usd_gross * SLIPPAGE_FACTOR:,.4f} USDT (after slippage)")
+            print(f"   2. Split the USDT and buy the exact BUY amounts shown above")
+            print(f"      → Every position lands at exactly the equal-weight target")
+        
+        print("\n⚠️  Notes:")
+        print(f"   • Using {SLIPPAGE_PCT}% slippage assumption (configurable)")
+        print("   • Tokens Δ = exact amount to buy (+) or sell (-) at current price")
+        print("   • All held tokens are shown (even tiny deltas)")
+        print("   • Re-run script right before trading — prices move fast")
+
+    # Final console summary
     print(f"\n✅ Portfolio snapshot saved to: {csv_path}")
     print(f"   Total portfolio value: ${total_usd:,.8f} USD")
     print(f"   Time (KST): {timestamp_str}")
