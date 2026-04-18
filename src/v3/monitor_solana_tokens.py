@@ -27,9 +27,7 @@ TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 # =======================================================
 
 def load_tokens() -> list[dict]:
-    """Load the list of tokens from tokens_list.json.
-    Expected format: array of objects with 'symbol', 'id' (CoinGecko ID), 'mint' (Solana address).
-    Example entry: {"symbol": "FARTCOIN", "id": "fartcoin", "mint": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"}"""
+    """Load the list of tokens from tokens_list.json."""
     file_path = Path(CONFIG["TOKENS_FILE"])
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -38,7 +36,6 @@ def load_tokens() -> list[dict]:
         if not isinstance(tokens, list):
             raise ValueError("JSON must be an array [] of token objects")
         
-        # Basic validation
         for i, token in enumerate(tokens):
             if not all(key in token for key in ("symbol", "id", "mint")):
                 raise ValueError(f"Token at index {i} missing required keys: symbol, id, mint")
@@ -61,9 +58,7 @@ def load_tokens() -> list[dict]:
 
 
 def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
-    """Single RPC call to fetch ALL token accounts for the wallet (jsonParsed encoding).
-    Returns dict[mint_address: {"raw_amount": str, "decimals": int}].
-    If a mint has multiple accounts (rare), we sum the raw amounts."""
+    """Single RPC call to fetch ALL token accounts for the wallet."""
     payload = {
         "jsonrpc": "2.0",
         "id": 1,
@@ -98,7 +93,6 @@ def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
         decimals = token_amount.get("decimals", 0)
 
         if mint in token_data:
-            # Sum raw amounts if user has multiple token accounts for same mint
             current_raw = int(token_data[mint]["raw_amount"])
             new_raw = int(raw_amount_str)
             token_data[mint]["raw_amount"] = str(current_raw + new_raw)
@@ -112,8 +106,7 @@ def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
 
 
 def get_prices(gecko_ids: list[str]) -> dict[str, Decimal]:
-    """Batch fetch current USD prices from CoinGecko simple/price (single call).
-    Converts JSON float to string then to Decimal to preserve as much precision as the API provides."""
+    """Batch fetch current USD prices from CoinGecko."""
     if not gecko_ids:
         return {}
     ids_str = ",".join(gecko_ids)
@@ -143,7 +136,7 @@ def main():
         print("No wallet address provided. Exiting.")
         return
 
-    # 1. Load tokens from JSON (symbol + id + mint pre-loaded)
+    # 1. Load tokens from JSON
     tokens = load_tokens()
     gecko_ids = [t["id"] for t in tokens]
 
@@ -151,7 +144,7 @@ def main():
     print("\nFetching USD prices from CoinGecko (free tier)...")
     prices = get_prices(gecko_ids)
 
-    # 3. Fetch precise token balances (raw integer amounts + decimals from blockchain)
+    # 3. Fetch precise token balances
     print("Fetching token balances from Solana RPC...")
     try:
         token_accounts = get_all_token_accounts(wallet)
@@ -160,7 +153,7 @@ def main():
         print("Tip: Public RPCs are rate-limited. Consider a free Helius.dev or Ankr RPC key in CONFIG.")
         return
 
-    # 4. Build portfolio with full Decimal math (no float anywhere)
+    # 4. Build portfolio with full Decimal math
     portfolio = []
     total_usd = Decimal("0")
 
@@ -169,10 +162,7 @@ def main():
         mint = token["mint"]
         symbol = token["symbol"]
 
-        if gid not in prices:
-            price = Decimal("0")
-        else:
-            price = prices[gid]
+        price = prices.get(gid, Decimal("0"))
 
         # Get balance (0 if not held)
         if mint in token_accounts:
@@ -195,7 +185,7 @@ def main():
             "value_usd": value_usd,
         })
 
-    # 5. Percentages and "equivalent value" (how many of THIS token = entire portfolio value)
+    # 5. Percentages and equivalent value
     if total_usd > 0:
         for item in portfolio:
             item["percent"] = (item["value_usd"] / total_usd) * Decimal("100")
@@ -210,8 +200,7 @@ def main():
     timestamp_str = kst_now.strftime("%Y-%m-%d %H:%M:%S KST")
     filename_ts = kst_now.strftime("%Y%m%d_%H%M%S")
 
-    # 7. CSV output → wallet_data/ folder (tokens first, TOTAL at the very bottom)
-    #     wallet_address column has been completely removed as requested
+    # 7. CSV output (unchanged)
     csv_dir = Path(CONFIG["CSV_OUTPUT_DIR"])
     csv_dir.mkdir(parents=True, exist_ok=True)
     csv_path = csv_dir / CONFIG["CSV_FILENAME_TEMPLATE"].format(timestamp=filename_ts)
@@ -226,7 +215,6 @@ def main():
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
-        # Token rows first (details)
         for item in portfolio:
             writer.writerow({
                 "timestamp_kst": timestamp_str,
@@ -241,7 +229,7 @@ def main():
                 "equivalent_tokens_if_all_swapped": str(item["equivalent"])
             })
 
-        # TOTAL row at the bottom (as requested)
+        # TOTAL row
         writer.writerow({
             "timestamp_kst": timestamp_str,
             "total_usd": str(total_usd),
@@ -255,7 +243,27 @@ def main():
             "equivalent_tokens_if_all_swapped": ""
         })
 
-    # Final console summary (NO wallet address shown for privacy)
+    # ====================== NEW: CONSOLE PERCENTAGE BREAKDOWN ======================
+    print("\n=== 📊 Portfolio Breakdown by USD Value ===")
+    if total_usd > 0:
+        # Sort by value (highest first) and show only tokens you actually hold
+        sorted_portfolio = sorted(portfolio, key=lambda x: x["value_usd"], reverse=True)
+        held_tokens = [item for item in sorted_portfolio if item["balance"] > 0]
+
+        if held_tokens:
+            print(f"{'Symbol':>12} | {'Balance':>18} | {'Value USD':>15} | {'Portfolio %':>10}")
+            print("-" * 62)
+            for item in held_tokens:
+                print(f"{item['symbol']:>12} | "
+                      f"{item['balance']:>18,.8f} | "
+                      f"${item['value_usd']:>14,.4f} | "
+                      f"{float(item['percent']):>9.4f}%")
+        else:
+            print("No tokens with positive balance found in the tracked list.")
+    else:
+        print("Portfolio value is $0.00 — nothing to break down.")
+
+    # Final console summary (unchanged, no wallet address shown)
     print(f"\n✅ Portfolio snapshot saved to: {csv_path}")
     print(f"   Total portfolio value: ${total_usd:,.8f} USD")
     print(f"   Time (KST): {timestamp_str}")
