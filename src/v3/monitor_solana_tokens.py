@@ -25,7 +25,11 @@ SLIPPAGE_PCT = Decimal(str(CONFIG["SLIPPAGE_PERCENT"]))
 SLIPPAGE_FACTOR = Decimal("1") - (SLIPPAGE_PCT / Decimal("100"))
 print(f"Slippage assumption loaded: {SLIPPAGE_PCT}% → effective factor {SLIPPAGE_FACTOR}")
 
-TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+# === MODERN STANDARD: Support both Token programs (used by all major wallets/explorers) ===
+TOKEN_PROGRAMS = [
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",   # Legacy SPL Token Program
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"    # Token-2022 Program (most new memes, extensions, etc.)
+]
 # =======================================================
 
 def load_tokens() -> list[dict]:
@@ -68,39 +72,44 @@ def load_tokens() -> list[dict]:
 
 
 def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
-    """Single RPC call to fetch ALL token accounts for the wallet."""
-    payload = {
-        "jsonrpc": "2.0", "id": 1,
-        "method": "getTokenAccountsByOwner",
-        "params": [wallet_address, {"programId": TOKEN_PROGRAM_ID}, {"encoding": "jsonParsed"}]
-    }
-    response = requests.post(CONFIG["RPC_URL"], json=payload, timeout=20)
-    response.raise_for_status()
-    result = response.json()
-    if "error" in result:
-        raise Exception(f"Solana RPC error: {result['error']}")
-
-    accounts = result.get("result", {}).get("value", [])
+    """Fetch ALL token accounts for the wallet from BOTH Token and Token-2022 programs.
+    This is the current standard used by Phantom, Solscan, Birdeye, Jupiter, etc.
+    Merges results and sums raw_amounts if the same mint appears in both programs (very rare)."""
     token_data: dict[str, dict] = {}
 
-    for acc in accounts:
-        parsed = acc.get("account", {}).get("data", {}).get("parsed", {})
-        if parsed.get("type") != "account":
-            continue
-        info = parsed.get("info", {})
-        mint = info.get("mint")
-        if not mint:
-            continue
-        token_amount = info.get("tokenAmount", {})
-        raw_amount_str = token_amount.get("amount", "0")
-        decimals = token_amount.get("decimals", 0)
+    for program_id in TOKEN_PROGRAMS:
+        payload = {
+            "jsonrpc": "2.0", "id": 1,
+            "method": "getTokenAccountsByOwner",
+            "params": [wallet_address, {"programId": program_id}, {"encoding": "jsonParsed"}]
+        }
+        response = requests.post(CONFIG["RPC_URL"], json=payload, timeout=20)
+        response.raise_for_status()
+        result = response.json()
+        if "error" in result:
+            raise Exception(f"Solana RPC error ({program_id}): {result['error']}")
 
-        if mint in token_data:
-            current_raw = int(token_data[mint]["raw_amount"])
-            new_raw = int(raw_amount_str)
-            token_data[mint]["raw_amount"] = str(current_raw + new_raw)
-        else:
-            token_data[mint] = {"raw_amount": raw_amount_str, "decimals": decimals}
+        accounts = result.get("result", {}).get("value", [])
+
+        for acc in accounts:
+            parsed = acc.get("account", {}).get("data", {}).get("parsed", {})
+            if parsed.get("type") != "account":
+                continue
+            info = parsed.get("info", {})
+            mint = info.get("mint")
+            if not mint:
+                continue
+            token_amount = info.get("tokenAmount", {})
+            raw_amount_str = token_amount.get("amount", "0")
+            decimals = token_amount.get("decimals", 0)
+
+            if mint in token_data:
+                # Sum across programs or multiple accounts
+                current_raw = int(token_data[mint]["raw_amount"])
+                new_raw = int(raw_amount_str)
+                token_data[mint]["raw_amount"] = str(current_raw + new_raw)
+            else:
+                token_data[mint] = {"raw_amount": raw_amount_str, "decimals": decimals}
 
     return token_data
 
@@ -175,6 +184,7 @@ def get_starting_snapshot(gecko_id: str) -> dict | None:
 
 def main():
     print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC + Equal Rebalance + Slippage + include_in_portfolio) ===\n")
+    print("Now supports BOTH Token and Token-2022 programs (modern standard)")
     wallet = input("Enter your Solana wallet address: ").strip()
     if not wallet:
         print("No wallet address provided. Exiting.")
@@ -186,7 +196,7 @@ def main():
     print("\nFetching USD prices from CoinGecko (free tier)...")
     prices = get_prices(gecko_ids)
 
-    print("Fetching token balances from Solana RPC...")
+    print("Fetching token balances from Solana RPC (Token + Token-2022)...")
     try:
         token_accounts = get_all_token_accounts(wallet)
         native_sol_balance = get_native_sol_balance(wallet)
