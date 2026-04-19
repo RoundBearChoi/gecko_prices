@@ -356,35 +356,50 @@ def main():
                   f"{item['balance']:>18,.8f} | "
                   f"${item['value_usd']:>14,.4f}  [EXCLUDED]")
 
-    # ====================== Starting Equivalent Tokens Comparison ======================
+    # ====================== Starting Equivalent Tokens Comparison (NOW SORTED BY DELTA USD) ======================
     print("\n=== 📈 Starting Equivalent Tokens Comparison ===")
     print("   (Only included tokens - slippage adjusted)")
     print(f"{'Symbol':>12} | {'Current Equiv':>22} | {'Starting Equiv':>22} | {'Delta Equiv':>22} | {'Delta USD':>19} | {'% Change':>12}")
     print("-" * 120)
 
-    has_starting_data = False
-    for item in sorted_portfolio:
+    comparison_data = []
+
+    for item in portfolio:                     # we use the full portfolio list (order doesn't matter before sorting)
         if not item["include_in_portfolio"]:
             continue
         snapshot = get_starting_snapshot(item["gecko_id"])
         if snapshot is not None:
-            has_starting_data = True
             current = item["equivalent"]
             starting = snapshot["equivalent"]
-            delta = current - starting
-            delta_usd = delta * item["price_usd"]
+            delta_equiv = current - starting
+            delta_usd = delta_equiv * item["price_usd"]
+
+            # Pre-format strings exactly as before
             delta_usd_str = f"${delta_usd:+,.2f}" if delta_usd != Decimal("0") else "$0.00"
+            pct_str = f"{float((delta_equiv / starting) * Decimal('100')):+.2f}%" if starting > 0 else "N/A"
 
-            pct_str = f"{float((delta / starting) * Decimal('100')):+.2f}%" if starting > 0 else "N/A"
+            comparison_data.append({
+                "symbol": item["symbol"],
+                "current": current,
+                "starting": starting,
+                "delta_equiv": delta_equiv,
+                "delta_usd": delta_usd,
+                "delta_usd_str": delta_usd_str,
+                "pct_str": pct_str
+            })
 
-            print(f"{item['symbol']:>12} | "
-                  f"{current:>22,.8f} | "
-                  f"{starting:>22,.8f} | "
-                  f"{delta:>22,.8f} | "
-                  f"{delta_usd_str:>19} | "
-                  f"{pct_str:>12}")
+    # ── SORT BY DELTA USD ASCENDING (biggest negative/loss on top) ──
+    comparison_data.sort(key=lambda x: x["delta_usd"])
 
-    if not has_starting_data:
+    if comparison_data:
+        for data in comparison_data:
+            print(f"{data['symbol']:>12} | "
+                  f"{data['current']:>22,.8f} | "
+                  f"{data['starting']:>22,.8f} | "
+                  f"{data['delta_equiv']:>22,.8f} | "
+                  f"{data['delta_usd_str']:>19} | "
+                  f"{data['pct_str']:>12}")
+    else:
         print("No starting point CSV files found for included tokens.")
 
     # ====================== PRICE PERFORMANCE (UPDATED: NOW SORTED BY % CHANGE HIGH→LOW) ======================
