@@ -89,5 +89,19 @@
     "mint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
     "include_in_portfolio": true,
     "comment": ""
+  },
+  {
+    "symbol": "RAY",
+    "id": "raydium",
+    "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+    "include_in_portfolio": true,
+    "comment": "Raydium DEX governance & utility token on Solana"
+  },
+  {
+    "symbol": "HYPE",
+    "id": "wormhole-bridged-hype",
+    "mint": "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
+    "include_in_portfolio": true,
+    "comment": ""
   }
 ]
