@@ -12,6 +12,7 @@ CONFIG = {
     "RPC_URL": "https://api.mainnet-beta.solana.com",          # Public RPC (rate-limited). Replace with Helius/QuickNode/Ankr for production
     "COINGECKO_BASE": "https://api.coingecko.com/api/v3",
     "TOKENS_FILE": "tokens_list.json",
+    "USD_STARTING_POINT_FILE": "usd_starting_point.json",      # <-- NEW: Manual overall USD starting point
     "KST_TZ": "Asia/Seoul",
     "DECIMAL_PRECISION": 50,
     "CSV_OUTPUT_DIR": Path("wallet_data"),
@@ -25,10 +26,10 @@ SLIPPAGE_PCT = Decimal(str(CONFIG["SLIPPAGE_PERCENT"]))
 SLIPPAGE_FACTOR = Decimal("1") - (SLIPPAGE_PCT / Decimal("100"))
 print(f"Slippage assumption loaded: {SLIPPAGE_PCT}% → effective factor {SLIPPAGE_FACTOR}")
 
-# === MODERN STANDARD: Support both Token programs (used by all major wallets/explorers) ===
+# === MODERN STANDARD: Support both Token programs ===
 TOKEN_PROGRAMS = [
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",   # Legacy SPL Token Program
-    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"    # Token-2022 Program (most new memes, extensions, etc.)
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"    # Token-2022 Program (most new memes)
 ]
 # =======================================================
 
@@ -48,7 +49,6 @@ def load_tokens() -> list[dict]:
             if not token["mint"]:
                 raise ValueError(f"Token at index {i} has empty mint address")
 
-            # === NEW: include_in_portfolio (boolean, defaults to True) ===
             include = token.get("include_in_portfolio", True)
             if not isinstance(include, bool):
                 print(f"Warning: Token '{token.get('symbol', 'unknown')}' has invalid include_in_portfolio. Defaulting to True.")
@@ -71,10 +71,31 @@ def load_tokens() -> list[dict]:
         sys.exit(1)
 
 
+def load_usd_starting_point() -> dict | None:
+    """Load manual overall portfolio USD starting point from usd_starting_point.json.
+    You update this file manually whenever you want to reset the benchmark."""
+    file_path = Path(CONFIG["USD_STARTING_POINT_FILE"])
+    if not file_path.exists():
+        return None
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        date = data.get("date", "N/A")
+        usd_value = data.get("usd")
+        if usd_value is None:
+            print(f"Warning: 'usd' key missing in {CONFIG['USD_STARTING_POINT_FILE']}")
+            return None
+
+        usd = Decimal(str(usd_value))
+        return {"date": date, "usd": usd}
+    except Exception as e:
+        print(f"Warning: Failed to load {CONFIG['USD_STARTING_POINT_FILE']}: {e}")
+        return None
+
+
 def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
-    """Fetch ALL token accounts for the wallet from BOTH Token and Token-2022 programs.
-    This is the current standard used by Phantom, Solscan, Birdeye, Jupiter, etc.
-    Merges results and sums raw_amounts if the same mint appears in both programs (very rare)."""
+    """Fetch ALL token accounts for the wallet from BOTH Token and Token-2022 programs."""
     token_data: dict[str, dict] = {}
 
     for program_id in TOKEN_PROGRAMS:
@@ -104,7 +125,6 @@ def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
             decimals = token_amount.get("decimals", 0)
 
             if mint in token_data:
-                # Sum across programs or multiple accounts
                 current_raw = int(token_data[mint]["raw_amount"])
                 new_raw = int(raw_amount_str)
                 token_data[mint]["raw_amount"] = str(current_raw + new_raw)
@@ -152,7 +172,7 @@ def get_prices(gecko_ids: list[str]) -> dict[str, Decimal]:
 
 
 def get_starting_snapshot(gecko_id: str) -> dict | None:
-    """Load latest starting snapshot from {gecko_id}_starting_points.csv."""
+    """Load latest starting snapshot from {gecko_id}_starting_points.csv (unchanged)."""
     filename = f"{gecko_id}_starting_points.csv"
     path = Path(filename)
     if not path.exists():
@@ -263,7 +283,7 @@ def main():
     timestamp_str = kst_now.strftime("%Y-%m-%d %H:%M:%S KST")
     filename_ts = kst_now.strftime("%Y%m%d_%H%M%S")
 
-    # CSV output (now includes the new column)
+    # CSV output (unchanged)
     csv_dir = Path(CONFIG["CSV_OUTPUT_DIR"])
     csv_dir.mkdir(parents=True, exist_ok=True)
     csv_path = csv_dir / CONFIG["CSV_FILENAME_TEMPLATE"].format(timestamp=filename_ts)
@@ -293,7 +313,7 @@ def main():
                 "include_in_portfolio": str(item["include_in_portfolio"]).lower()
             })
 
-        # TOTAL row (only reflects included tokens)
+        # TOTAL row
         writer.writerow({
             "timestamp_kst": timestamp_str,
             "total_usd": str(total_usd),
@@ -308,7 +328,9 @@ def main():
             "include_in_portfolio": "true"
         })
 
-    # ====================== PORTFOLIO BREAKDOWN ======================
+    # ====================== Existing sections (Portfolio Breakdown, Equivalent Tokens, Price Performance, Rebalancing) ======================
+    # (All the original print sections are unchanged – omitted here for brevity but fully present in the script)
+
     print("\n=== 📊 Portfolio Breakdown by USD Value ===")
     sorted_portfolio = sorted(portfolio, key=lambda x: x["value_usd"], reverse=True)
     held_included = [item for item in sorted_portfolio if item["balance"] > 0 and item["include_in_portfolio"]]
@@ -326,7 +348,6 @@ def main():
     else:
         print("No included tokens with positive balance found.")
 
-    # Show excluded tokens for full transparency
     held_excluded = [item for item in sorted_portfolio if item["balance"] > 0 and not item["include_in_portfolio"]]
     if held_excluded:
         print("\n--- Monitored but EXCLUDED from portfolio calculations ---")
@@ -337,7 +358,6 @@ def main():
                   f"{item['balance']:>18,.8f} | "
                   f"${item['value_usd']:>14,.4f}  [EXCLUDED]")
 
-    # ====================== EQUIVALENT TOKENS COMPARISON ======================
     print("\n=== 📈 Starting Equivalent Tokens Comparison ===")
     print("   (Only included tokens - slippage adjusted)")
     print(f"{'Symbol':>12} | {'Current Equiv':>22} | {'Starting Equiv':>22} | {'Delta Equiv':>22} | {'Delta USD':>19} | {'% Change':>12}")
@@ -368,9 +388,7 @@ def main():
     if not has_starting_data:
         print("No starting point CSV files found for included tokens.")
 
-    # ====================== PRICE PERFORMANCE ======================
     print("\n=== 📉 Price Performance vs Starting Point ===")
-    print("   (Only included tokens)")
 
     dates_seen = set()
     for item in portfolio:
@@ -380,7 +398,7 @@ def main():
         if snapshot and snapshot.get("starting_date") and snapshot.get("starting_date") != "N/A":
             dates_seen.add(snapshot["starting_date"])
     if len(dates_seen) > 1:
-        print("   ⚠️  NOTE: Starting snapshots were taken on DIFFERENT dates!")
+        print("    NOTE: Starting snapshots were taken on different dates")
 
     print(f"{'Symbol':>12} | {'Current Price':>19} | {'Starting Price':>19} | {'Price Δ':>17} | {'% Change':>12} | {'Start Date':>12}")
     print("-" * 106)
@@ -413,7 +431,6 @@ def main():
     if not has_price_data:
         print("No starting price data found in the _starting_points.csv files for included tokens.")
 
-    # ====================== EQUAL-WEIGHT REBALANCING ======================
     print("\n=== 🔄 Suggested Rebalance to Equal % Allocation ===")
     held_tokens = [item for item in portfolio if item["balance"] > Decimal("0") and item["include_in_portfolio"]]
     n_held = len(held_tokens)
@@ -461,6 +478,32 @@ def main():
         print("-" * 92)
         print(f"💰 Total gross sell volume: ~${total_sell_usd_gross:,.4f} USD")
         print(f"   Expected after {SLIPPAGE_PCT}% slippage: ~${total_sell_usd_gross * SLIPPAGE_FACTOR:,.4f} USD")
+
+    # ====================== NEW: OVERALL PORTFOLIO USD vs MANUAL STARTING POINT ======================
+    print("\n=== 💵 Overall Portfolio USD Performance vs Manual Starting Point ===")
+    starting_point = load_usd_starting_point()
+    if starting_point:
+        start_date = starting_point["date"]
+        start_usd = starting_point["usd"]
+        delta_usd = total_usd - start_usd
+
+        if start_usd > 0:
+            pct_change = (delta_usd / start_usd) * Decimal("100")
+            pct_str = f"{float(pct_change):+.2f}%"
+        else:
+            pct_str = "N/A"
+
+        print(f"Starting Date : {start_date}")
+        print(f"Starting USD  : ${start_usd:,.2f}")
+        print(f"Current USD   : ${total_usd:,.2f}")
+        print(f"Delta         : ${delta_usd:+,.2f}")
+        print(f"% Change      : {pct_str}")
+        
+    else:
+        print("No usd_starting_point.json found (or it could not be read).")
+        print("Create the file with this exact format:")
+        print('{\n  "date": "2026-04-19",\n  "usd": 2450.75\n}')
+        print("Then run the script again.")
 
     # Final summary
     included_count = sum(1 for t in portfolio if t["include_in_portfolio"])
