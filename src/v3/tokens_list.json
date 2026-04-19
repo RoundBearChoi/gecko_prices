@@ -38,8 +38,8 @@
     "symbol": "aura",
     "id": "aura-on-sol",
     "mint": "DtR4D9FtVoTX2569gaL837ZgrB6wNjj6tkmnX9Rdk9B2",
-    "include_in_portfolio": true,
-    "comment": ""
+    "include_in_portfolio": false,
+    "comment": "falling below 1m 1d volume (apr 19th 2026)"
   },
   {
     "symbol": "FWOG",
