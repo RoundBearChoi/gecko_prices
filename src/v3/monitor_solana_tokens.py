@@ -53,9 +53,6 @@ def load_tokens() -> list[dict]:
                 token["include_in_portfolio"] = include
 
         print(f"Loaded {len(tokens)} tokens from {CONFIG['TOKENS_FILE']}")
-        included = sum(1 for t in tokens if t["include_in_portfolio"])
-        if included < len(tokens):
-            print(f"   → {included} included in portfolio calculations | {len(tokens)-included} excluded (monitored only)")
         return tokens
 
     except FileNotFoundError:
