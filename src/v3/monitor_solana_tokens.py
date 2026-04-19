@@ -328,9 +328,7 @@ def main():
             "include_in_portfolio": "true"
         })
 
-    # ====================== Existing sections (Portfolio Breakdown, Equivalent Tokens, Price Performance, Rebalancing) ======================
-    # (All the original print sections are unchanged – omitted here for brevity but fully present in the script)
-
+    # ====================== Portfolio Breakdown ======================
     print("\n=== 📊 Portfolio Breakdown by USD Value ===")
     sorted_portfolio = sorted(portfolio, key=lambda x: x["value_usd"], reverse=True)
     held_included = [item for item in sorted_portfolio if item["balance"] > 0 and item["include_in_portfolio"]]
@@ -358,6 +356,7 @@ def main():
                   f"{item['balance']:>18,.8f} | "
                   f"${item['value_usd']:>14,.4f}  [EXCLUDED]")
 
+    # ====================== Starting Equivalent Tokens Comparison ======================
     print("\n=== 📈 Starting Equivalent Tokens Comparison ===")
     print("   (Only included tokens - slippage adjusted)")
     print(f"{'Symbol':>12} | {'Current Equiv':>22} | {'Starting Equiv':>22} | {'Delta Equiv':>22} | {'Delta USD':>19} | {'% Change':>12}")
@@ -388,44 +387,54 @@ def main():
     if not has_starting_data:
         print("No starting point CSV files found for included tokens.")
 
+    # ====================== PRICE PERFORMANCE (UPDATED: NOW SORTED BY % CHANGE HIGH→LOW) ======================
     print("\n=== 📉 Price Performance vs Starting Point ===")
 
+    # Collect performance data first so we can sort it cleanly
+    price_performance = []
     for item in portfolio:
         if not item["include_in_portfolio"]:
             continue
         snapshot = get_starting_snapshot(item["gecko_id"])
-
-    print(f"{'Symbol':>12} | {'Current Price':>19} | {'Starting Price':>19} | {'Price Δ':>17} | {'% Change':>12} | {'Start Date':>12}")
-    print("-" * 106)
-
-    has_price_data = False
-    for item in sorted_portfolio:
-        if not item["include_in_portfolio"]:
-            continue
-        snapshot = get_starting_snapshot(item["gecko_id"])
         if snapshot and snapshot.get("starting_price") is not None and snapshot["starting_price"] > Decimal("0"):
-            has_price_data = True
             current_p = item["price_usd"]
             start_p = snapshot["starting_price"]
             delta_p = current_p - start_p
             pct_change = (delta_p / start_p) * Decimal("100")
             start_date = snapshot.get("starting_date", "N/A")
 
-            current_str = f"${current_p:,.6f}"
-            start_str = f"${start_p:,.6f}"
-            delta_str = f"${delta_p:,.6f}"
-            pct_str = f"{float(pct_change):+8.2f}%"
+            price_performance.append({
+                "symbol": item["symbol"],
+                "current_p": current_p,
+                "start_p": start_p,
+                "delta_p": delta_p,
+                "pct_change": pct_change,
+                "start_date": start_date
+            })
 
-            print(f"{item['symbol']:>12} | "
+    if price_performance:
+        # === SORT BY % CHANGE DESCENDING (highest to lowest) ===
+        price_performance.sort(key=lambda x: x["pct_change"], reverse=True)
+
+        print(f"{'Symbol':>12} | {'Current Price':>19} | {'Starting Price':>19} | {'Price Δ':>17} | {'% Change':>12} | {'Start Date':>12}")
+        print("-" * 106)
+
+        for perf in price_performance:
+            current_str = f"${perf['current_p']:,.6f}"
+            start_str = f"${perf['start_p']:,.6f}"
+            delta_str = f"${perf['delta_p']:,.6f}"
+            pct_str = f"{float(perf['pct_change']):+8.2f}%"
+
+            print(f"{perf['symbol']:>12} | "
                   f"{current_str:>19} | "
                   f"{start_str:>19} | "
                   f"{delta_str:>17} | "
                   f"{pct_str:>12} | "
-                  f"{start_date:>12}")
-
-    if not has_price_data:
+                  f"{perf['start_date']:>12}")
+    else:
         print("No starting price data found in the _starting_points.csv files for included tokens.")
 
+    # ====================== Suggested Rebalance ======================
     print("\n=== 🔄 Suggested Rebalance to Equal % Allocation ===")
     held_tokens = [item for item in portfolio if item["balance"] > Decimal("0") and item["include_in_portfolio"]]
     n_held = len(held_tokens)
