@@ -390,15 +390,10 @@ def main():
 
     print("\n=== 📉 Price Performance vs Starting Point ===")
 
-    dates_seen = set()
     for item in portfolio:
         if not item["include_in_portfolio"]:
             continue
         snapshot = get_starting_snapshot(item["gecko_id"])
-        if snapshot and snapshot.get("starting_date") and snapshot.get("starting_date") != "N/A":
-            dates_seen.add(snapshot["starting_date"])
-    if len(dates_seen) > 1:
-        print("    NOTE: Starting snapshots were taken on different dates")
 
     print(f"{'Symbol':>12} | {'Current Price':>19} | {'Starting Price':>19} | {'Price Δ':>17} | {'% Change':>12} | {'Start Date':>12}")
     print("-" * 106)
