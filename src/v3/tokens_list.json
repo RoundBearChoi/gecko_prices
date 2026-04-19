@@ -82,5 +82,12 @@
     "mint": "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij",
     "include_in_portfolio": true,
     "comment": ""
+  },
+  {
+    "symbol": "PUMP",
+    "id": "pump-fun",
+    "mint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+    "include_in_portfolio": true,
+    "comment": ""
   }
 ]
