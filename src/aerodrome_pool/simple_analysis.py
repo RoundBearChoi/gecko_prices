@@ -1,11 +1,14 @@
 import pandas as pd
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
 
 # ========================= CONFIG SECTION =========================
 DAYS_BACK = 14
 CONFIDENCE_LEVEL = 0.95
 CSV_FILENAME = 'aerodrome_msusd_usdc_hourly_data.csv'
 OUTPUT_TXT = 'simple_analysis_results.txt'   # <-- Change filename here if you want
+CHART_FILENAME = 'simple_analysis_chart.png' # New: chart output file
+DPI = 180                                    # New: chart resolution (as requested)
 # ================================================================
 
 # Load and prepare data
@@ -80,3 +83,39 @@ with open(OUTPUT_TXT, 'w', encoding='utf-8') as f:
     f.write(output)
 
 print(f"\n✅ Results successfully exported to: {OUTPUT_TXT}")
+
+# ========================= CHART GENERATION =========================
+plt.figure(figsize=(12, 6))
+
+# Price trend line
+plt.plot(recent['datetime'], recent['close'],
+         label='Hourly Close Price (MSUSD-USDC)',
+         color='blue', linewidth=2.5)
+
+# Recommended pool range (shaded band)
+plt.fill_between(recent['datetime'], lower_price, upper_price,
+                 color='red', alpha=0.12, label='95% Recommended Pool Range')
+
+# Horizontal reference lines
+plt.axhline(y=lower_price, color='red', linestyle='--', linewidth=1.8,
+            label=f'Lower Bound: {lower_price:.6f}')
+plt.axhline(y=upper_price, color='red', linestyle='--', linewidth=1.8,
+            label=f'Upper Bound: {upper_price:.6f}')
+plt.axhline(y=current_price, color='purple', linestyle='-', linewidth=2,
+            label=f'Current Price: {current_price:.6f}')
+
+plt.title(f'MSUSD-USDC Recent Price Action & Recommended Pool Range\n'
+          f'(Last {DAYS_BACK} Days — {CONFIDENCE_LEVEL:.0%} Empirical Coverage)')
+plt.xlabel('Date / Time')
+plt.ylabel('Price (USDC)')
+plt.legend(loc='best')
+plt.grid(True, alpha=0.3)
+plt.xticks(rotation=45, ha='right')
+plt.tight_layout()
+
+# Save chart
+plt.savefig(CHART_FILENAME, dpi=DPI, bbox_inches='tight')
+plt.close()
+
+print(f"📊 Chart successfully exported to: {CHART_FILENAME} (DPI={DPI})")
+# =====================================================================
