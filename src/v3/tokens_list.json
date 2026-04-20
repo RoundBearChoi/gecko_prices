@@ -45,8 +45,8 @@
     "symbol": "FWOG",
     "id": "fwog",
     "mint": "A8C3xuqscfmyLrte3VmTqrAq8kgMASius9AFNANwpump",
-    "include_in_portfolio": true,
-    "comment": ""
+    "include_in_portfolio": false,
+    "comment": "385M tokens sent between insiders (39% of supply)"
   },
   {
     "symbol": "would",
