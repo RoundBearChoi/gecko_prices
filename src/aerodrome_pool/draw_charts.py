@@ -6,7 +6,7 @@ import os
 
 # ==================== CONFIG SECTION ====================
 # Change these settings as needed
-TIME_WINDOW = '14d'           # Options: 'all', '7d', '30d', '90d', '180d', '360d'
+TIME_WINDOW = '2d'           # Options: 'all', '7d', '30d', '90d', '180d', '360d'
 SAVE_DIR = '.'               # Folder to save PNGs (use '.' for current folder)
 DPI = 180
 SHOW_PLOTS = False           # Set True only if you want to see them interactively too
