@@ -8,6 +8,10 @@ CSV_FILE = 'aerodrome_msusd_usdc_hourly_data.csv'
 N_BOOT = 5000
 SEED = 42
 OUTPUT_PREFIX = 'aerodrome_msusd_usdc_lp_analysis'   # filename base
+
+# NEW: Explicit pair direction (prevents any confusion with USDC-MSUSD)
+PAIR_NAME = "MSUSD-USDC"
+PAIR_DESCRIPTION = "price quoted as USDC per 1 MSUSD"
 # ===================================================
 
 # Load and clean
@@ -54,6 +58,13 @@ lp_upper_price = current_price * (1 + boot_upper)
 # ====================== PRINT TO CONSOLE ======================
 print(f"Loaded {len(df)} hourly candles → {len(returns)} returns")
 print(f"Price range: {df['close'].min():.5f} – {df['close'].max():.5f} (mean {df['close'].mean():.5f})")
+
+# NEW: Clear pair direction banner in console
+print("\n" + "="*60)
+print(f"PAIR DIRECTION: {PAIR_NAME}")
+print(f"                ({PAIR_DESCRIPTION})")
+print("="*60)
+
 print("\n=== Empirical ===")
 print(f"Mean hourly change : {emp_mean*100:+.4f}%")
 print(f"Median              : {emp_median*100:+.4f}%")
@@ -79,6 +90,14 @@ with open(filename, 'w', encoding='utf-8') as f:
     f.write(f"Data points used: {len(returns)} hourly close-to-close returns\n")
     f.write(f"Current price (last close): {current_price:.5f}\n\n")
     
+    # NEW: Explicit pair direction section in TXT
+    f.write("=== PAIR DIRECTION ===\n")
+    f.write(f"Analysis performed for : {PAIR_NAME}\n")
+    f.write(f"Price quoting convention: {PAIR_DESCRIPTION}\n")
+    f.write("• This is NOT the reverse USDC-MSUSD pool\n")
+    f.write("• Lower/upper bounds below are already in the correct pool-native units\n")
+    f.write("• You can copy-paste them directly into Aerodrome’s concentrated LP interface\n\n")
+    
     f.write("=== EMPIRICAL STATISTICS ===\n")
     f.write(f"Mean hourly change   : {emp_mean*100:+.4f}%\n")
     f.write(f"Median hourly change : {emp_median*100:+.4f}%\n")
@@ -101,5 +120,7 @@ with open(filename, 'w', encoding='utf-8') as f:
     f.write("• Non-parametric bootstrap (no normality assumption)\n")
     f.write("• Perfect for setting a tight but safe Aerodrome concentrated LP range\n")
     f.write("• Re-run daily for rolling updates\n")
+    f.write("• Pair direction is hard-coded and matches your CSV filename convention\n")
 
 print(f"\n✅ Results exported to: {filename}")
+print(f"   (Pair direction {PAIR_NAME} is now clearly shown in both console and TXT)")

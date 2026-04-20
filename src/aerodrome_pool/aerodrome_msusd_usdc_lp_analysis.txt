@@ -1,9 +1,16 @@
 === AERODROME MSUSD-USDC HOURLY BOOTSTRAP ANALYSIS ===
 
-Run time (KST): 2026-04-20 13:47:21 KST
-Run time (UTC): 2026-04-20 04:47:21 UTC
+Run time (KST): 2026-04-20 13:52:18 KST
+Run time (UTC): 2026-04-20 04:52:18 UTC
 Data points used: 998 hourly close-to-close returns
 Current price (last close): 0.99934
+
+=== PAIR DIRECTION ===
+Analysis performed for : MSUSD-USDC
+Price quoting convention: price quoted as USDC per 1 MSUSD
+• This is NOT the reverse USDC-MSUSD pool
+• Lower/upper bounds below are already in the correct pool-native units
+• You can copy-paste them directly into Aerodrome’s concentrated LP interface
 
 === EMPIRICAL STATISTICS ===
 Mean hourly change   : +0.0011%
@@ -27,3 +34,4 @@ Range width            : ±0.783%
 • Non-parametric bootstrap (no normality assumption)
 • Perfect for setting a tight but safe Aerodrome concentrated LP range
 • Re-run daily for rolling updates
+• Pair direction is hard-coded and matches your CSV filename convention
