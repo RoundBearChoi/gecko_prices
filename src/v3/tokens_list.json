@@ -103,5 +103,12 @@
     "mint": "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
     "include_in_portfolio": true,
     "comment": ""
+  },
+  {
+    "symbol": "ZEC",
+    "id": "omnibridge-bridged-zcash-solana",
+    "mint": "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS",
+    "include_in_portfolio": true,
+    "comment": ""
   }
 ]

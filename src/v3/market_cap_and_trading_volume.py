@@ -75,9 +75,10 @@ def get_total_volume(coin_id, days, headers, base_url):
     return None
 
 def save_to_csv(results, filename=OUTPUT_CSV):
-    """Save results to CSV with the new 1d average column."""
+    """Save results to CSV with the new include_in_portfolio column."""
     fieldnames = [
-        "symbol", "coin_id", "market_cap", "volume_1d_total",
+        "symbol", "coin_id", "include_in_portfolio",
+        "market_cap", "volume_1d_total",
         "volume_7d_total", "volume_30d_total", "volume_1d_avg_30d",
         "price", "price_change_24h_pct", "timestamp"
     ]
@@ -90,6 +91,7 @@ def save_to_csv(results, filename=OUTPUT_CSV):
             row = {
                 "symbol": data["symbol"],
                 "coin_id": coin_id,
+                "include_in_portfolio": "Yes" if data.get("include_in_portfolio") else "No",
                 "market_cap": data.get("market_cap") or "",
                 "volume_1d_total": data.get("volume_1d_total") or "",
                 "volume_7d_total": data.get("volume_7d_total") or "",
@@ -103,7 +105,7 @@ def save_to_csv(results, filename=OUTPUT_CSV):
     print(f"💾 Results saved to → {filename}")
 
 def main():
-    print("🚀 CoinGecko Volume Fetcher v6 (1d / 7d / 30d totals + 1d Avg from 30d)\n")
+    print("🚀 CoinGecko Volume Fetcher v6 (1d / 7d / 30d totals + 1d Avg from 30d + portfolio flag)\n")
     
     # Masked input — everything appears as *
     print("🔑 Please paste your CoinGecko API key (everything will appear as *):")
@@ -129,6 +131,7 @@ def main():
     # Load tokens
     tokens = load_tokens()
     id_to_symbol = {token["id"]: token["symbol"] for token in tokens}
+    id_to_include = {token["id"]: token.get("include_in_portfolio", False) for token in tokens}
     coin_ids = list(id_to_symbol.keys())
     
     print(f"\n📡 Fetching data for {len(coin_ids)} tokens at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -147,6 +150,7 @@ def main():
         symbol = id_to_symbol.get(coin_id, coin_id.upper())
         results[coin_id] = {
             "symbol": symbol,
+            "include_in_portfolio": id_to_include.get(coin_id, False),
             "market_cap": coin.get("market_cap"),
             "volume_1d_total": coin.get("total_volume"),
             "price": coin.get("current_price"),
@@ -169,7 +173,7 @@ def main():
             
             time.sleep(0.6)
     
-    # 3. Console output (new column placed right after 30d volume)
+    # 3. Console output (unchanged)
     print("\n" + "="*130)
     print("CONSOLE RESULTS — ALL VOLUMES IN USD")
     print("="*130)
