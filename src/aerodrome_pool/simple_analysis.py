@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 
 # ========================= CONFIG SECTION =========================
-DAYS_BACK = 21
+DAYS_BACK = 2
 CONFIDENCE_LEVEL = 0.95
 CSV_FILENAME = 'aerodrome_msusd_usdc_hourly_data.csv'
 OUTPUT_TXT = 'simple_analysis_results.txt'   # <-- Change filename here if you want
