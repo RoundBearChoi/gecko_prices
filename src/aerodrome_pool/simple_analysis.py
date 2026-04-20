@@ -3,12 +3,15 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 
 # ========================= CONFIG SECTION =========================
-DAYS_BACK = 14
+DAYS_BACK = 21
 CONFIDENCE_LEVEL = 0.95
 CSV_FILENAME = 'aerodrome_msusd_usdc_hourly_data.csv'
-OUTPUT_TXT = 'simple_analysis_results.txt'   # <-- Change filename here if you want
-CHART_FILENAME = 'simple_analysis_chart.png' # New: chart output file
-DPI = 180                                    # New: chart resolution (as requested)
+OUTPUT_TXT = 'simple_analysis_results.txt'
+
+# Chart configuration (new/updated)
+CHART_FILENAME = 'simple_analysis_chart.png'
+DPI = 180
+CHART_FIGSIZE = (12, 9)          # Wider + taller to make room for results below
 # ================================================================
 
 # Load and prepare data
@@ -44,7 +47,7 @@ upper_pct = (upper_price - current_price) / current_price * 100
 max_below_pct = (current_price - prices.min()) / current_price * 100
 max_above_pct = (prices.max() - current_price) / current_price * 100
 
-# Build nice output
+# Build nice output (TXT file - unchanged)
 analysis_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 output = f"""MSUSD-USDC Pool Range Analysis
@@ -85,33 +88,57 @@ with open(OUTPUT_TXT, 'w', encoding='utf-8') as f:
 print(f"\n✅ Results successfully exported to: {OUTPUT_TXT}")
 
 # ========================= CHART GENERATION =========================
-plt.figure(figsize=(12, 6))
+fig, ax = plt.subplots(figsize=CHART_FIGSIZE)
 
 # Price trend line
-plt.plot(recent['datetime'], recent['close'],
-         label='Hourly Close Price (MSUSD-USDC)',
-         color='blue', linewidth=2.5)
+ax.plot(recent['datetime'], recent['close'],
+        label='Hourly Close Price (MSUSD-USDC)',
+        color='blue', linewidth=2.5)
 
 # Recommended pool range (shaded band)
-plt.fill_between(recent['datetime'], lower_price, upper_price,
-                 color='red', alpha=0.12, label='95% Recommended Pool Range')
+ax.fill_between(recent['datetime'], lower_price, upper_price,
+                color='red', alpha=0.12, label='95% Recommended Pool Range')
 
-# Horizontal reference lines
-plt.axhline(y=lower_price, color='red', linestyle='--', linewidth=1.8,
-            label=f'Lower Bound: {lower_price:.6f}')
-plt.axhline(y=upper_price, color='red', linestyle='--', linewidth=1.8,
-            label=f'Upper Bound: {upper_price:.6f}')
-plt.axhline(y=current_price, color='purple', linestyle='-', linewidth=2,
-            label=f'Current Price: {current_price:.6f}')
+# Horizontal reference lines (clean legend - no numbers here anymore)
+ax.axhline(y=lower_price, color='red', linestyle='--', linewidth=1.8)
+ax.axhline(y=upper_price, color='red', linestyle='--', linewidth=1.8)
+ax.axhline(y=current_price, color='purple', linestyle='-', linewidth=2)
 
-plt.title(f'MSUSD-USDC Recent Price Action & Recommended Pool Range\n'
-          f'(Last {DAYS_BACK} Days — {CONFIDENCE_LEVEL:.0%} Empirical Coverage)')
-plt.xlabel('Date / Time')
-plt.ylabel('Price (USDC)')
-plt.legend(loc='best')
-plt.grid(True, alpha=0.3)
+ax.set_title(f'MSUSD-USDC Recent Price Action & Recommended Pool Range\n'
+             f'(Last {DAYS_BACK} Days — {CONFIDENCE_LEVEL:.0%} Empirical Coverage)',
+             fontsize=14, pad=20)
+ax.set_xlabel('Date / Time')
+ax.set_ylabel('Price (USDC)')
+ax.legend(loc='upper right')
+ax.grid(True, alpha=0.3)
 plt.xticks(rotation=45, ha='right')
-plt.tight_layout()
+
+# Make room below the chart for the results text
+plt.subplots_adjust(bottom=0.32)
+
+# Key Results Text Box (placed outside / below the chart)
+summary_text = f"""KEY RESULTS
+────────────────────────────────────
+Current Price          : {current_price:.6f} USDC
+
+95% Recommended Range  : {lower_price:.6f} – {upper_price:.6f}
+                       ({lower_pct:+.3f}% / {upper_pct:+.3f}% from current)
+
+Median Hourly Change   : {median_hourly_pct:+.4f}%
+Median Daily Change    : {median_daily_pct:+.4f}%
+
+Max Observed Drop      : {max_below_pct:.3f}%
+Max Observed Rise      : {max_above_pct:.3f}%
+
+Period analyzed: {recent['datetime'].min().strftime('%Y-%m-%d')} → {latest_date.strftime('%Y-%m-%d')}
+({len(recent)} hourly closes)
+"""
+
+fig.text(0.05, 0.03, summary_text, fontsize=11, family='monospace',
+         verticalalignment='bottom', horizontalalignment='left',
+         bbox=dict(boxstyle="round,pad=1", facecolor="whitesmoke", alpha=0.95, edgecolor="gray"))
+
+plt.tight_layout(rect=[0, 0.32, 1, 1])   # respect the bottom space we reserved
 
 # Save chart
 plt.savefig(CHART_FILENAME, dpi=DPI, bbox_inches='tight')

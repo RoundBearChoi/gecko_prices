@@ -1,27 +1,27 @@
 MSUSD-USDC Pool Range Analysis
 ================================
-Analysis generated: 2026-04-20 15:03:47
-Data period analyzed: 2026-04-06 12:00 → 2026-04-20 12:00
-Hours included: 331
+Analysis generated: 2026-04-20 15:07:24
+Data period analyzed: 2026-03-30 15:00 → 2026-04-20 15:00
+Hours included: 494
 
-Current Price (latest close): 0.999336
+Current Price (latest close): 0.998783
 
 MOST LIKELY PRICE MOVES
 -----------------------
-Median hourly change : -0.0189%
-Median daily change  : +0.0380%
+Median hourly change : -0.0207%
+Median daily change  : +0.0357%
 
 95% COVERAGE RANGE (empirical quantiles)
 ----------------------------------------
-Lower bound: 0.991314   (0.803% below current)
-Upper bound: 1.001581   (0.225% above current)
+Lower bound: 0.991344   (0.745% below current)
+Upper bound: 1.002550   (0.377% above current)
 
-→ Recommended pool range: 0.991314 – 1.001581
+→ Recommended pool range: 0.991344 – 1.002550
 
 MAX OBSERVED DEVIATION
 ----------------------
-Max below current: 1.012%
-Max above current: 0.406%
-Full observed range: 0.989222 – 1.003390
+Max below current: 0.957%
+Max above current: 0.577%
+Full observed range: 0.989222 – 1.004544
 
-Note: This range covered 95% of all hourly closes in the last 14 days.
+Note: This range covered 95% of all hourly closes in the last 21 days.
