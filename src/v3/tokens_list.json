@@ -42,13 +42,6 @@
     "comment": "extremely low 1d volume (apr 19th 2026)"
   },
   {
-    "symbol": "UFD",
-    "id": "unicorn-fart-dust",
-    "mint": "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump",
-    "include_in_portfolio": true,
-    "comment": ""
-  },
-  {
     "symbol": "ETH",
     "id": "ethereum-wormhole",
     "mint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
