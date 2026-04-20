@@ -1,6 +1,6 @@
 MSUSD-USDC Pool Range Analysis
 ================================
-Analysis generated: 2026-04-20 15:07:24
+Analysis generated: 2026-04-20 15:15:23
 Data period analyzed: 2026-03-30 15:00 → 2026-04-20 15:00
 Hours included: 494
 
