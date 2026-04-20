@@ -35,13 +35,6 @@
     "comment": ""
   },
   {
-    "symbol": "would",
-    "id": "would",
-    "mint": "J1Wpmugrooj1yMyQKrdZ2vwRXG5rhfx3vTnYE39gpump",
-    "include_in_portfolio": false,
-    "comment": "extremely low 1d volume (apr 19th 2026)"
-  },
-  {
     "symbol": "ETH",
     "id": "ethereum-wormhole",
     "mint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
