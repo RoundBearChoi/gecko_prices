@@ -1,7 +1,7 @@
 === AERODROME MSUSD-USDC HOURLY BOOTSTRAP ANALYSIS ===
 
-Run time (KST): 2026-04-20 13:52:18 KST
-Run time (UTC): 2026-04-20 04:52:18 UTC
+Run time (KST): 2026-04-20 13:53:55 KST
+Run time (UTC): 2026-04-20 04:53:55 UTC
 Data points used: 998 hourly close-to-close returns
 Current price (last close): 0.99934
 
