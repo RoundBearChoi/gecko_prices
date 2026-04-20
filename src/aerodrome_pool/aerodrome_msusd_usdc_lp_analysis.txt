@@ -1,8 +1,9 @@
 === AERODROME MSUSD-USDC HOURLY BOOTSTRAP ANALYSIS ===
 
-Run time (KST): 2026-04-20 13:53:55 KST
-Run time (UTC): 2026-04-20 04:53:55 UTC
-Data points used: 998 hourly close-to-close returns
+Run time (KST): 2026-04-20 14:53:30 KST
+Run time (UTC): 2026-04-20 05:53:30 UTC
+Data period     : most recent 21 days (2026-03-30 – 2026-04-20)
+Data points used: 493 hourly close-to-close returns
 Current price (last close): 0.99934
 
 === PAIR DIRECTION ===
@@ -13,25 +14,26 @@ Price quoting convention: price quoted as USDC per 1 MSUSD
 • You can copy-paste them directly into Aerodrome’s concentrated LP interface
 
 === EMPIRICAL STATISTICS ===
-Mean hourly change   : +0.0011%
-Median hourly change : -0.0035%
-Std dev              : 0.4330%
-Raw 95% range        : -0.8020% to 0.7659%
+Mean hourly change   : +0.0003%
+Median hourly change : -0.0207%
+Std dev              : 0.4358%
+Raw 95% range        : -0.8220% to 0.7947%
 
 === BOOTSTRAPPED RESULTS (5000 resamples) ===
-Most likely hourly change (median) : -0.0031%
-95% statistical coverage range     : -0.8011% to 0.7651%
+Most likely hourly change (median) : -0.0207%
+95% statistical coverage range     : -0.8204% to 0.7947%
 
 === RECOMMENDED LIQUIDITY POOL RANGE ===
 Current price          : 0.99934
-Lower bound            : 0.99133  (-0.8011%)
-Upper bound            : 1.00698  (+0.7651%)
-Range width            : ±0.783%
+Lower bound            : 0.99114  (-0.8204%)
+Upper bound            : 1.00728  (+0.7947%)
+Range width            : ±0.808%
 95% of hourly moves historically stayed inside this range
 
 === NOTES ===
 • Based on close-to-close hourly % changes
 • Non-parametric bootstrap (no normality assumption)
+• Using most recent 21 days for more responsive LP positioning
 • Perfect for setting a tight but safe Aerodrome concentrated LP range
 • Re-run daily for rolling updates
 • Pair direction is hard-coded and matches your CSV filename convention

@@ -9,18 +9,43 @@ N_BOOT = 5000
 SEED = 42
 OUTPUT_PREFIX = 'aerodrome_msusd_usdc_lp_analysis'   # filename base
 
-# NEW: Explicit pair direction (prevents any confusion with USDC-MSUSD)
 PAIR_NAME = "MSUSD-USDC"
 PAIR_DESCRIPTION = "price quoted as USDC per 1 MSUSD"
+
+# NEW: Configurable lookback period
+LOOKBACK_DAYS = 21  # Set to None to use ALL historical data, or 7/14/21/30/etc. for recent days only
 # ===================================================
 
 # Load and clean
 df = pd.read_csv(CSV_FILE)
 df = df.sort_values('timestamp').drop_duplicates(subset=['timestamp']).reset_index(drop=True)
 
+# ====================== APPLY LOOKBACK FILTER ======================
+# Robust timestamp parsing (handles Unix seconds OR ISO strings)
+if pd.api.types.is_numeric_dtype(df['timestamp']):
+    # Most crypto hourly CSVs export Unix timestamp in seconds
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s', utc=True)
+else:
+    df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+
+data_period_str = "all available data"
+if LOOKBACK_DAYS is not None and LOOKBACK_DAYS > 0:
+    latest_time = df['timestamp'].max()
+    cutoff = latest_time - pd.Timedelta(days=LOOKBACK_DAYS)
+    original_len = len(df)
+    df = df[df['timestamp'] >= cutoff].reset_index(drop=True)
+    data_period_str = f"most recent {LOOKBACK_DAYS} days"
+    print(f"✅ Filtered to {data_period_str} → {len(df)}/{original_len} hourly candles")
+else:
+    print(f"✅ Using {data_period_str} ({len(df)} hourly candles)")
+
 # Hourly close-to-close percentage changes
 df['pct_change'] = df['close'].pct_change()
 returns = df['pct_change'].dropna().values
+
+# Optional safety warning for very short windows
+if len(returns) < 200:
+    print("⚠️  WARNING: Fewer than 200 returns used. Bootstrap estimates will be noisier.")
 
 current_price = df['close'].iloc[-1]
 run_time_kst = datetime.now(pytz.timezone('Asia/Seoul'))
@@ -56,7 +81,7 @@ lp_lower_price = current_price * (1 + boot_lower)
 lp_upper_price = current_price * (1 + boot_upper)
 
 # ====================== PRINT TO CONSOLE ======================
-print(f"Loaded {len(df)} hourly candles → {len(returns)} returns")
+print(f"\nLoaded {len(df)} hourly candles → {len(returns)} returns ({data_period_str})")
 print(f"Price range: {df['close'].min():.5f} – {df['close'].max():.5f} (mean {df['close'].mean():.5f})")
 
 # NEW: Clear pair direction banner in console
@@ -87,6 +112,7 @@ with open(filename, 'w', encoding='utf-8') as f:
     f.write("=== AERODROME MSUSD-USDC HOURLY BOOTSTRAP ANALYSIS ===\n\n")
     f.write(f"Run time (KST): {run_time_kst.strftime('%Y-%m-%d %H:%M:%S KST')}\n")
     f.write(f"Run time (UTC): {run_time_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}\n")
+    f.write(f"Data period     : {data_period_str} ({df['timestamp'].min().strftime('%Y-%m-%d')} – {df['timestamp'].max().strftime('%Y-%m-%d')})\n")
     f.write(f"Data points used: {len(returns)} hourly close-to-close returns\n")
     f.write(f"Current price (last close): {current_price:.5f}\n\n")
     
@@ -118,9 +144,10 @@ with open(filename, 'w', encoding='utf-8') as f:
     f.write("=== NOTES ===\n")
     f.write("• Based on close-to-close hourly % changes\n")
     f.write("• Non-parametric bootstrap (no normality assumption)\n")
+    f.write(f"• Using {data_period_str} for more responsive LP positioning\n")
     f.write("• Perfect for setting a tight but safe Aerodrome concentrated LP range\n")
     f.write("• Re-run daily for rolling updates\n")
     f.write("• Pair direction is hard-coded and matches your CSV filename convention\n")
 
 print(f"\n✅ Results exported to: {filename}")
-print(f"   (Pair direction {PAIR_NAME} is now clearly shown in both console and TXT)")
+print(f"   (Using {data_period_str} • Pair direction {PAIR_NAME} is now clearly shown)")
