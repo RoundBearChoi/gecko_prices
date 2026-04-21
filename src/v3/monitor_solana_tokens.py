@@ -12,15 +12,14 @@ CONFIG = {
     "RPC_URL": "https://api.mainnet-beta.solana.com",          # Public RPC (rate-limited). Replace with Helius/QuickNode/Ankr for production
     "COINGECKO_BASE": "https://api.coingecko.com/api/v3",
     "TOKENS_FILE": "tokens_list.json",
-    "USD_STARTING_POINT_FILE": "usd_starting_point.json",      # <-- NEW: Manual overall USD starting point
+    "USD_STARTING_POINT_FILE": "usd_starting_point.json",      # Manual overall USD starting point
     "KST_TZ": "Asia/Seoul",
     "DECIMAL_PRECISION": 50,
     "CSV_OUTPUT_DIR": Path("wallet_data"),
     "CSV_FILENAME_TEMPLATE": "solana_meme_portfolio_{timestamp}.csv",
     "INCLUDE_MINT_IN_CSV": True,
-    "SLIPPAGE_PERCENT": 1.5,
-    # ==================== NEW: PRIORITY TOKEN ALLOCATION (your request) ====================
-    "PRIORITY_TOKEN_SYMBOL": "cbbtc",          # Symbol for the priority token (case-insensitive). Change if you ever want another token.
+    "SLIPPAGE_PERCENT": 1.0,
+    "PRIORITY_TOKEN_SYMBOL": "cbbtc",          # Symbol for the priority token (case-insensitive)
     "PRIORITY_TARGET_PCT": 50.0,               # Target % for the priority token. Remaining % split equally among other held included tokens.
 }
 # =======================================================
@@ -286,7 +285,7 @@ def main():
     timestamp_str = kst_now.strftime("%Y-%m-%d %H:%M:%S KST")
     filename_ts = kst_now.strftime("%Y%m%d_%H%M%S")
 
-    # CSV output (unchanged)
+    # CSV output
     csv_dir = Path(CONFIG["CSV_OUTPUT_DIR"])
     csv_dir.mkdir(parents=True, exist_ok=True)
     csv_path = csv_dir / CONFIG["CSV_FILENAME_TEMPLATE"].format(timestamp=filename_ts)
