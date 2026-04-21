@@ -75,9 +75,9 @@ def get_total_volume(coin_id, days, headers, base_url):
     return None
 
 def save_to_csv(results, filename=OUTPUT_CSV):
-    """Save results to CSV with the new include_in_portfolio column."""
+    """Save results to CSV with the new include_in_portfolio column and coingecko_rank (next to coin_id)."""
     fieldnames = [
-        "symbol", "coin_id", "include_in_portfolio",
+        "symbol", "coin_id", "coingecko_rank", "include_in_portfolio",
         "market_cap", "volume_1d_total",
         "volume_7d_total", "volume_30d_total", "volume_1d_avg_30d",
         "price", "price_change_24h_pct", "timestamp"
@@ -91,6 +91,7 @@ def save_to_csv(results, filename=OUTPUT_CSV):
             row = {
                 "symbol": data["symbol"],
                 "coin_id": coin_id,
+                "coingecko_rank": data.get("coingecko_rank") or "",
                 "include_in_portfolio": "Yes" if data.get("include_in_portfolio") else "No",
                 "market_cap": data.get("market_cap") or "",
                 "volume_1d_total": data.get("volume_1d_total") or "",
@@ -105,7 +106,7 @@ def save_to_csv(results, filename=OUTPUT_CSV):
     print(f"💾 Results saved to → {filename}")
 
 def main():
-    print("🚀 CoinGecko Volume Fetcher v6 (1d / 7d / 30d totals + 1d Avg from 30d + portfolio flag)\n")
+    print("🚀 CoinGecko Volume Fetcher v6.1 (1d / 7d / 30d totals + 1d Avg from 30d + portfolio flag + CoinGecko Rank)\n")
     
     # Masked input — everything appears as *
     print("🔑 Please paste your CoinGecko API key (everything will appear as *):")
@@ -136,7 +137,7 @@ def main():
     
     print(f"\n📡 Fetching data for {len(coin_ids)} tokens at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     
-    # 1. Current market data
+    # 1. Current market data (now also pulls coingecko_rank)
     print("📊 Fetching current market data...")
     market_data = get_current_market_data(coin_ids, headers, BASE_URL)
     if not market_data:
@@ -151,6 +152,7 @@ def main():
         results[coin_id] = {
             "symbol": symbol,
             "include_in_portfolio": id_to_include.get(coin_id, False),
+            "coingecko_rank": coin.get("market_cap_rank"),   # ← NEW
             "market_cap": coin.get("market_cap"),
             "volume_1d_total": coin.get("total_volume"),
             "price": coin.get("current_price"),
@@ -168,18 +170,19 @@ def main():
             
             results[coin_id]["volume_7d_total"] = vol_7d
             results[coin_id]["volume_30d_total"] = vol_30d
-            # New column: 1d average from 30d total
             results[coin_id]["volume_1d_avg_30d"] = round(vol_30d / 30, 0) if vol_30d is not None else None
             
             time.sleep(0.6)
     
-    # 3. Console output (unchanged)
+    # 3. Console output (rank now shown next to coin_id)
     print("\n" + "="*130)
     print("CONSOLE RESULTS — ALL VOLUMES IN USD")
     print("="*130)
     for coin_id, data in results.items():
         sym = data["symbol"]
-        print(f"\n🔹 {sym} ({coin_id})")
+        rank = data.get("coingecko_rank")
+        rank_str = f" Rank #{rank}" if rank is not None else ""
+        print(f"\n🔹 {sym} ({coin_id}{rank_str})")
         print(f"   Price               : ${data.get('price'):,.6f}" if data.get("price") is not None else "   Price               : N/A")
         print(f"   24h Change          : {data.get('price_change_24h_pct'):+.2f}%" if data.get("price_change_24h_pct") is not None else "   24h Change          : N/A")
         print(f"   Market Cap          : ${data.get('market_cap'):,.0f}" if data.get("market_cap") is not None else "   Market Cap          : N/A")
