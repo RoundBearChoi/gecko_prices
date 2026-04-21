@@ -207,6 +207,7 @@ def get_starting_snapshot(gecko_id: str) -> dict | None:
 def main():
     print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC + Priority Rebalance + Slippage + include_in_portfolio) ===\n")
     print("Now supports BOTH Token and Token-2022 programs (modern standard)")
+    print("equivalent_tokens_if_all_swapped = keep your own holdings + sell all other included tokens into this one (after slippage)\n")
     wallet = input("Enter your Solana wallet address: ").strip()
     if not wallet:
         print("No wallet address provided. Exiting.")
@@ -265,13 +266,22 @@ def main():
             "include_in_portfolio": include_in_portfolio,
         })
 
-    # Percentages & equivalents ONLY for included tokens
+    # ====================== UPDATED EQUIVALENT LOGIC ======================
+    # equivalent_tokens_if_all_swapped = current balance of THIS token
+    # + (value of ALL OTHER included tokens * SLIPPAGE_FACTOR) / this token's price
     if total_usd > 0:
-        effective_total_after_slippage = total_usd * SLIPPAGE_FACTOR
         for item in portfolio:
             if item["include_in_portfolio"] and item["price_usd"] > Decimal("0"):
                 item["percent"] = (item["value_usd"] / total_usd) * Decimal("100")
-                item["equivalent"] = effective_total_after_slippage / item["price_usd"]
+
+                other_value_usd = total_usd - item["value_usd"]
+                if other_value_usd > Decimal("0"):
+                    effective_proceeds_from_others = other_value_usd * SLIPPAGE_FACTOR
+                    additional_tokens = effective_proceeds_from_others / item["price_usd"]
+                    item["equivalent"] = item["balance"] + additional_tokens
+                else:
+                    # Only this token is held → no slippage
+                    item["equivalent"] = item["balance"]
             else:
                 item["percent"] = Decimal("0")
                 item["equivalent"] = Decimal("0")
@@ -360,7 +370,7 @@ def main():
 
     # ====================== Starting Equivalent Tokens Comparison ======================
     print("\n=== 📈 Starting Equivalent Tokens Comparison ===")
-    print("   (Only included tokens - slippage adjusted)")
+    print("   (Keep your current holdings of this token + sell all other included tokens into it after slippage)")
     print(f"{'Symbol':>12} | {'Current Equiv':>22} | {'Starting Equiv':>22} | {'Delta Equiv':>22} | {'Delta USD':>19} | {'% Change':>12}")
     print("-" * 120)
 
