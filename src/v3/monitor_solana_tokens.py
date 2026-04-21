@@ -19,7 +19,11 @@ CONFIG = {
     "CSV_FILENAME_TEMPLATE": "solana_meme_portfolio_{timestamp}.csv",
     "INCLUDE_MINT_IN_CSV": True,
     "SLIPPAGE_PERCENT": 1.5,
+    # ==================== NEW: PRIORITY TOKEN ALLOCATION (your request) ====================
+    "PRIORITY_TOKEN_SYMBOL": "cbbtc",          # Symbol for the priority token (case-insensitive). Change if you ever want another token.
+    "PRIORITY_TARGET_PCT": 50.0,               # Target % for the priority token. Remaining % split equally among other held included tokens.
 }
+# =======================================================
 
 getcontext().prec = CONFIG["DECIMAL_PRECISION"]
 SLIPPAGE_PCT = Decimal(str(CONFIG["SLIPPAGE_PERCENT"]))
@@ -72,8 +76,7 @@ def load_tokens() -> list[dict]:
 
 
 def load_usd_starting_point() -> dict | None:
-    """Load manual overall portfolio USD starting point from usd_starting_point.json.
-    You update this file manually whenever you want to reset the benchmark."""
+    """Load manual overall portfolio USD starting point from usd_starting_point.json."""
     file_path = Path(CONFIG["USD_STARTING_POINT_FILE"])
     if not file_path.exists():
         return None
@@ -172,7 +175,7 @@ def get_prices(gecko_ids: list[str]) -> dict[str, Decimal]:
 
 
 def get_starting_snapshot(gecko_id: str) -> dict | None:
-    """Load latest starting snapshot from {gecko_id}_starting_points.csv (unchanged)."""
+    """Load latest starting snapshot from {gecko_id}_starting_points.csv."""
     filename = f"{gecko_id}_starting_points.csv"
     path = Path(filename)
     if not path.exists():
@@ -203,7 +206,7 @@ def get_starting_snapshot(gecko_id: str) -> dict | None:
 
 
 def main():
-    print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC + Equal Rebalance + Slippage + include_in_portfolio) ===\n")
+    print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC + Priority Rebalance + Slippage + include_in_portfolio) ===\n")
     print("Now supports BOTH Token and Token-2022 programs (modern standard)")
     wallet = input("Enter your Solana wallet address: ").strip()
     if not wallet:
@@ -356,7 +359,7 @@ def main():
                   f"{item['balance']:>18,.8f} | "
                   f"${item['value_usd']:>14,.4f}  [EXCLUDED]")
 
-    # ====================== Starting Equivalent Tokens Comparison (NOW SORTED BY DELTA USD) ======================
+    # ====================== Starting Equivalent Tokens Comparison ======================
     print("\n=== 📈 Starting Equivalent Tokens Comparison ===")
     print("   (Only included tokens - slippage adjusted)")
     print(f"{'Symbol':>12} | {'Current Equiv':>22} | {'Starting Equiv':>22} | {'Delta Equiv':>22} | {'Delta USD':>19} | {'% Change':>12}")
@@ -364,7 +367,7 @@ def main():
 
     comparison_data = []
 
-    for item in portfolio:                     # we use the full portfolio list (order doesn't matter before sorting)
+    for item in portfolio:
         if not item["include_in_portfolio"]:
             continue
         snapshot = get_starting_snapshot(item["gecko_id"])
@@ -374,7 +377,6 @@ def main():
             delta_equiv = current - starting
             delta_usd = delta_equiv * item["price_usd"]
 
-            # Pre-format strings exactly as before
             delta_usd_str = f"${delta_usd:+,.2f}" if delta_usd != Decimal("0") else "$0.00"
             pct_str = f"{float((delta_equiv / starting) * Decimal('100')):+.2f}%" if starting > 0 else "N/A"
 
@@ -388,7 +390,6 @@ def main():
                 "pct_str": pct_str
             })
 
-    # ── SORT BY DELTA USD ASCENDING (biggest negative/loss on top) ──
     comparison_data.sort(key=lambda x: x["delta_usd"])
 
     if comparison_data:
@@ -402,10 +403,9 @@ def main():
     else:
         print("No starting point CSV files found for included tokens.")
 
-    # ====================== PRICE PERFORMANCE (UPDATED: NOW SORTED BY % CHANGE HIGH→LOW) ======================
+    # ====================== PRICE PERFORMANCE ======================
     print("\n=== 📉 Price Performance vs Starting Point ===")
 
-    # Collect performance data first so we can sort it cleanly
     price_performance = []
     for item in portfolio:
         if not item["include_in_portfolio"]:
@@ -428,7 +428,6 @@ def main():
             })
 
     if price_performance:
-        # === SORT BY % CHANGE DESCENDING (highest to lowest) ===
         price_performance.sort(key=lambda x: x["pct_change"], reverse=True)
 
         print(f"{'Symbol':>12} | {'Current Price':>19} | {'Starting Price':>19} | {'Price Δ':>17} | {'% Change':>12} | {'Start Date':>12}")
@@ -449,32 +448,69 @@ def main():
     else:
         print("No starting price data found in the _starting_points.csv files for included tokens.")
 
-    # ====================== Suggested Rebalance ======================
-    print("\n=== 🔄 Suggested Rebalance to Equal % Allocation ===")
+    # ====================== Suggested Rebalance (Priority Token Logic) ======================
+    print("\n=== 🔄 Suggested Rebalance (Priority Token + Equal Others) ===")
+    
     held_tokens = [item for item in portfolio if item["balance"] > Decimal("0") and item["include_in_portfolio"]]
-    n_held = len(held_tokens)
-
-    if n_held < 2 or total_usd < Decimal("10"):
-        print("Need at least 2 held included tokens and >$10 total value to suggest rebalancing.")
+    all_included = [item for item in portfolio if item["include_in_portfolio"]]
+    
+    priority_symbol_lower = CONFIG.get("PRIORITY_TOKEN_SYMBOL", "cbbtc").lower()
+    priority_target_pct_float = CONFIG.get("PRIORITY_TARGET_PCT", 50.0)
+    priority_target_pct = Decimal(str(priority_target_pct_float))
+    
+    if priority_target_pct > Decimal("100"):
+        priority_target_pct = Decimal("100")
+    
+    remaining_pct = Decimal("100") - priority_target_pct
+    
+    # Find priority item (even if currently zero balance)
+    priority_item = next((item for item in all_included if item["symbol"].lower() == priority_symbol_lower), None)
+    
+    # Other held tokens (exclude priority)
+    other_held = [item for item in held_tokens if item["symbol"].lower() != priority_symbol_lower]
+    num_other_held = len(other_held)
+    
+    if num_other_held > 0:
+        other_target_pct = remaining_pct / Decimal(num_other_held)
     else:
-        target_usd = total_usd / Decimal(n_held)
-        target_pct = Decimal("100") / Decimal(n_held)
-        effective_target_usd = target_usd * SLIPPAGE_FACTOR
-
-        print(f"📌 Rebalancing among {n_held} included held tokens")
-        print(f"   Target per token (gross): ${target_usd:,.6f} USD  ({target_pct:.2f}% each)")
-        print(f"   After {SLIPPAGE_PCT}% slippage: ~${effective_target_usd:,.6f} USD deployable")
-
+        other_target_pct = Decimal("0")
+    
+    # Calculate target USD
+    target_usds = {}
+    if priority_item:
+        target_usds[priority_item["symbol"]] = (priority_target_pct / Decimal("100")) * total_usd
+    for item in other_held:
+        target_usds[item["symbol"]] = (other_target_pct / Decimal("100")) * total_usd
+    
+    # Tokens to show in rebalance table (held + priority even if zero)
+    rebalance_tokens = held_tokens[:]
+    if priority_item and priority_item["balance"] <= Decimal("0") and priority_item["symbol"] not in [t["symbol"] for t in rebalance_tokens]:
+        rebalance_tokens.append(priority_item)
+    
+    if total_usd < Decimal("10") or len(rebalance_tokens) < 1:
+        print("Portfolio value too low or no tokens to rebalance.")
+    else:
+        print(f"📌 Priority: {CONFIG['PRIORITY_TOKEN_SYMBOL'].upper()} targeting {float(priority_target_pct):.1f}%")
+        if num_other_held > 0:
+            print(f"   Remaining {float(remaining_pct):.1f}% split equally among {num_other_held} other held tokens (~{float(other_target_pct):.2f}% each)")
+        else:
+            print("   No other held tokens - full allocation goes to priority token.")
+        
         print(f"\n{'Symbol':>12} | {'Current $':>14} | {'Current %':>9} | {'Action':>8} | {'USD Δ (gross)':>16} | {'Tokens Δ':>18}")
         print("-" * 92)
-
+        
         total_sell_usd_gross = Decimal("0")
         actions = []
-
-        for item in sorted(held_tokens, key=lambda x: x["value_usd"], reverse=True):
-            delta_usd = item["value_usd"] - target_usd
-            tokens_delta = delta_usd / item["price_usd"] if item["price_usd"] > Decimal("0") else Decimal("0")
-
+        
+        for item in sorted(rebalance_tokens, key=lambda x: x["value_usd"], reverse=True):
+            symbol = item["symbol"]
+            current_usd = item["value_usd"]
+            target_usd = target_usds.get(symbol, Decimal("0"))
+            delta_usd = current_usd - target_usd
+            
+            price = item["price_usd"]
+            tokens_delta = delta_usd / price if price > Decimal("0") else Decimal("0")
+            
             if delta_usd > Decimal("0"):
                 action_str = "SELL"
                 usd_str = f"-${delta_usd:,.6f}"
@@ -485,20 +521,21 @@ def main():
                 usd_str = f"+${abs(delta_usd):,.6f}"
                 token_delta_str = f"+{abs(tokens_delta):,.8f}"
             else:
-                action_str = " - "
+                action_str = "HOLD"
                 usd_str = "$0.000000"
                 token_delta_str = "0.00000000"
-
-            actions.append((item["symbol"], item["value_usd"], item["percent"], action_str, usd_str, token_delta_str))
-
+            
+            current_pct = item.get("percent", Decimal("0"))
+            actions.append((symbol, current_usd, current_pct, action_str, usd_str, token_delta_str))
+        
         for sym, val, pct, act, usd_d, tok_d in actions:
             print(f"{sym:>12} | ${val:>12,.4f} | {float(pct):>8.2f}% | {act:>8} | {usd_d:>16} | {tok_d:>18}")
-
+        
         print("-" * 92)
         print(f"💰 Total gross sell volume: ~${total_sell_usd_gross:,.4f} USD")
         print(f"   Expected after {SLIPPAGE_PCT}% slippage: ~${total_sell_usd_gross * SLIPPAGE_FACTOR:,.4f} USD")
 
-    # ====================== NEW: OVERALL PORTFOLIO USD vs MANUAL STARTING POINT ======================
+    # ====================== Overall Portfolio USD vs Manual Starting Point ======================
     print("\n=== 💵 Overall Portfolio USD Performance vs Manual Starting Point ===")
     starting_point = load_usd_starting_point()
     if starting_point:
@@ -517,7 +554,6 @@ def main():
         print(f"Current USD   : ${total_usd:,.2f}")
         print(f"Delta         : ${delta_usd:+,.2f}")
         print(f"% Change      : {pct_str}")
-        
     else:
         print("No usd_starting_point.json found (or it could not be read).")
         print("Create the file with this exact format:")
