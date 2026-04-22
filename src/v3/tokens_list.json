@@ -82,5 +82,26 @@
     "mint": "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS",
     "include_in_portfolio": true,
     "comment": ""
+  },
+  {
+    "symbol": "MET",
+    "id": "meteora",
+    "mint": "METvsvVRapdj9cFLzq4Tr43xK4tAjQfwX76z3n6mWQL",
+    "include_in_portfolio": true,
+    "comment": ""
+  },
+  {
+    "symbol": "KMNO",
+    "id": "kamino",
+    "mint": "KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS",
+    "include_in_portfolio": true,
+    "comment": ""
+  },
+  {
+    "symbol": "JUP",
+    "id": "jupiter-exchange-solana",
+    "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    "include_in_portfolio": true,
+    "comment": ""
   }
 ]

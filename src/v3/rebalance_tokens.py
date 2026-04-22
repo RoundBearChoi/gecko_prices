@@ -11,7 +11,7 @@ CONFIG = {
     'target_main_percent': 60.0,           # ← Change this to whatever % you want for CBBTC (e.g. 50.0, 70.0, etc.)
     'slippage_percent': 1.0,               # Assumed slippage on every trade (buy or sell side)
     'wallet_data_dir': Path('wallet_data'),  # Folder where your portfolio CSVs live
-    'min_delta_threshold_usd': 2.0,        # Ignore tiny imbalances (< $2) to reduce noise
+    'min_delta_threshold_usd': 10.0,        # Ignore tiny imbalances (< $2) to reduce noise
     'route_all_trades_through_main': True, # If True, all sells go to CBBTC first, then CBBTC → losers (simpler on Solana)
     
     # === TXT Export Configuration ===

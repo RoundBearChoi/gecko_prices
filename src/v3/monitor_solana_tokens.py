@@ -541,7 +541,15 @@ def main():
             print(f"{sym:>12} | ${val:>12,.4f} | {float(pct):>8.2f}% | {act:>8} | {usd_d:>16} | {tok_d:>18}")
         
         print("-" * 92)
-        print(f"💰 Total gross sell volume: ~${total_sell_usd_gross:,.4f} USD")
+        
+        # === NEW: Show total gross sell volume as % of portfolio ===
+        if total_usd > Decimal("0"):
+            sell_percentage = (total_sell_usd_gross / total_usd) * Decimal("100")
+            pct_str = f" ({float(sell_percentage):.2f}% of portfolio)"
+        else:
+            pct_str = ""
+        
+        print(f"💰 Total gross sell volume: ~${total_sell_usd_gross:,.4f} USD{pct_str}")
         print(f"   Expected after {SLIPPAGE_PCT}% slippage: ~${total_sell_usd_gross * SLIPPAGE_FACTOR:,.4f} USD")
 
     # ====================== Overall Portfolio USD vs Manual Starting Point ======================
