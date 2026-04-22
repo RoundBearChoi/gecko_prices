@@ -20,7 +20,7 @@ CONFIG = {
     "INCLUDE_MINT_IN_CSV": True,
     "SLIPPAGE_PERCENT": 1.0,
     "PRIORITY_TOKEN_SYMBOL": "cbbtc",          # Symbol for the priority token (case-insensitive)
-    "PRIORITY_TARGET_PCT": 50.0,               # Target % for the priority token. Remaining % split equally among other held included tokens.
+    "PRIORITY_TARGET_PCT": 60.0,               # Target % for the priority token. Remaining % split equally among other held included tokens.
 }
 # =======================================================
 
