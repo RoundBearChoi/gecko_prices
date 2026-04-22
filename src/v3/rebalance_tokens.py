@@ -13,6 +13,10 @@ CONFIG = {
     'wallet_data_dir': Path('wallet_data'),  # Folder where your portfolio CSVs live
     'min_delta_threshold_usd': 2.0,        # Ignore tiny imbalances (< $2) to reduce noise
     'route_all_trades_through_main': True, # If True, all sells go to CBBTC first, then CBBTC → losers (simpler on Solana)
+    
+    # === TXT Export Configuration ===
+    'export_to_txt': True,
+    'txt_filename': 'rebalance_report.txt',   # Fixed name – overwrites every run. Saved in same folder as this script.
 }
 # ======================================================
 
@@ -27,7 +31,7 @@ def load_latest_portfolio(wallet_dir: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"No portfolio CSV files found in {wallet_dir}. "
                                 f"Expected pattern: solana_meme_portfolio_YYYYMMDD_HHMMSS.csv")
     
-    # Use file modification time for robustness (works even if filename format changes slightly)
+    # Use file modification time for robustness
     latest_file = max(csv_files, key=lambda p: p.stat().st_mtime)
     print(f"✅ Loading latest portfolio snapshot: {latest_file.name}")
     
@@ -36,7 +40,7 @@ def load_latest_portfolio(wallet_dir: Path) -> pd.DataFrame:
 
 
 def main():
-    # Optional CLI override for target percent (useful for quick experiments)
+    # Optional CLI override for target percent
     parser = argparse.ArgumentParser(description="Solana Meme Portfolio Rebalancer")
     parser.add_argument('--target-cbbtc', type=float, default=None,
                         help=f"Override CBBTC target % (default: {CONFIG['target_main_percent']})")
@@ -45,6 +49,9 @@ def main():
     if args.target_cbbtc is not None:
         CONFIG['target_main_percent'] = args.target_cbbtc
         print(f"⚠️  Overrode CBBTC target to {CONFIG['target_main_percent']}% via CLI")
+
+    # For clean TXT export (trades section only, no emojis)
+    txt_lines: list[str] = []
 
     # 1. Load data
     df_raw, csv_path = load_latest_portfolio(CONFIG['wallet_data_dir'])
@@ -55,7 +62,7 @@ def main():
         raise ValueError("Could not find TOTAL row in CSV")
     total_usd = float(df_raw[total_mask]['total_usd'].iloc[0])
     
-    # 3. Filter to only included portfolio tokens (exclude TOTAL row)
+    # 3. Filter to only included portfolio tokens
     portfolio_df = df_raw[
         (df_raw['include_in_portfolio'] == True) &
         df_raw['symbol'].notna() &
@@ -93,7 +100,7 @@ def main():
     portfolio_df['target_token_count'] = (portfolio_df['target_usd'] / portfolio_df['price_usd']).round(8)
     portfolio_df['delta_tokens'] = (portfolio_df['token_count'] - portfolio_df['target_token_count']).round(8)
     
-    # 5. Report summary
+    # 5. Full console report (unchanged from previous version)
     print("\n" + "="*100)
     print(f"🚀 SOLANA MEME PORTFOLIO REBALANCER")
     print(f"   Snapshot: {csv_path.name} | Total Value: ${total_usd:,.2f} | Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -102,7 +109,6 @@ def main():
     print(f"   Slippage assumption: {CONFIG['slippage_percent']}% per trade side")
     print("="*100)
     
-    # Pretty table of current vs target
     display_cols = [
         'symbol', 'token_count', 'price_usd', 'value_usd',
         'portfolio_percent', 'target_percent', 'target_usd', 'delta_usd'
@@ -110,7 +116,7 @@ def main():
     print("\n📊 CURRENT vs TARGET ALLOCATION")
     print(portfolio_df[display_cols].round(4).to_string(index=False))
     
-    # 6. Greedy rebalance algorithm (biggest winners → biggest losers)
+    # 6. Greedy rebalance algorithm
     print("\n🔄 EXACT REBALANCE TRADES (Greedy Pairing)")
     print("   Strategy: Sort biggest winners (over-allocated) and biggest losers (under-allocated).")
     print("             Redistribute from winner → loser starting with the largest deficit.")
@@ -120,82 +126,95 @@ def main():
     winners = portfolio_df[portfolio_df['delta_usd'] > CONFIG['min_delta_threshold_usd']].copy()
     losers = portfolio_df[portfolio_df['delta_usd'] < -CONFIG['min_delta_threshold_usd']].copy()
     
-    winners = winners.sort_values('delta_usd', ascending=False).reset_index(drop=True)   # biggest winner first
-    losers = losers.sort_values('delta_usd', ascending=True).reset_index(drop=True)      # biggest loser (most negative) first
+    winners = winners.sort_values('delta_usd', ascending=False).reset_index(drop=True)
+    losers = losers.sort_values('delta_usd', ascending=True).reset_index(drop=True)
     
     if winners.empty:
         print("✅ Portfolio is already perfectly balanced (or within threshold). No action needed.")
-        return
-    
-    trade_plan = []
-    winner_idx = 0
-    slippage_adjustment_note = f" (expect ~{CONFIG['slippage_percent']}% loss on traded volume due to slippage)"
-    
-    for _, loser_row in losers.iterrows():
-        deficit_remaining = -loser_row['delta_usd']  # positive USD needed
-        
-        while deficit_remaining > CONFIG['min_delta_threshold_usd'] and winner_idx < len(winners):
-            winner_row = winners.iloc[winner_idx]
-            excess_remaining = winner_row['delta_usd']
-            
-            if excess_remaining <= CONFIG['min_delta_threshold_usd']:
-                winner_idx += 1
-                continue
-            
-            transfer_usd = min(deficit_remaining, excess_remaining)
-            
-            # Adjust for slippage: to actually receive the full target for the loser,
-            # the winner must sell slightly more (we use a simple one-sided adjustment here)
-            sell_usd_gross = transfer_usd / (1 - slippage) if CONFIG['route_all_trades_through_main'] else transfer_usd
-            sell_tokens = sell_usd_gross / winner_row['price_usd']
-            buy_tokens = transfer_usd / loser_row['price_usd']   # buyer receives at current price
-            
-            trade_plan.append({
-                'from_symbol': winner_row['symbol'],
-                'from_mint': winner_row.get('mint', 'N/A'),
-                'sell_tokens': round(sell_tokens, 8),
-                'sell_usd_gross': round(sell_usd_gross, 2),
-                'to_symbol': loser_row['symbol'],
-                'to_mint': loser_row.get('mint', 'N/A'),
-                'buy_tokens': round(buy_tokens, 8),
-                'buy_usd_net': round(transfer_usd, 2),
-            })
-            
-            # Update remainders
-            winners.at[winner_row.name, 'delta_usd'] = excess_remaining - transfer_usd
-            deficit_remaining -= transfer_usd
-            
-            # If winner is exhausted, move to next
-            if winners.at[winner_row.name, 'delta_usd'] <= CONFIG['min_delta_threshold_usd']:
-                winner_idx += 1
-    
-    # Output the trade plan
-    if trade_plan:
-        print(f"💱 Proposed Trades ({len(trade_plan)} swaps):")
-        for i, trade in enumerate(trade_plan, 1):
-            print(f"   {i:2d}. SELL  {trade['sell_tokens']:>12,.6f} {trade['from_symbol']:8} "
-                  f"(${trade['sell_usd_gross']:,.2f}) → BUY {trade['buy_tokens']:>12,.6f} {trade['to_symbol']}")
-            print(f"          (≈ ${trade['buy_usd_net']:,.2f} net to {trade['to_symbol']}){slippage_adjustment_note}")
-        
-        total_traded = sum(t['sell_usd_gross'] for t in trade_plan)
-        expected_slippage_loss = total_traded * slippage
-        print(f"\n📉 Total volume to trade: ~${total_traded:,.2f}")
-        print(f"   Expected slippage cost: ~${expected_slippage_loss:,.2f} (portfolio value will drop slightly)")
-        print(f"   After rebalance you should be within ~{CONFIG['min_delta_threshold_usd']*2:.0f} USD of targets.")
+        txt_lines.append("Portfolio is already perfectly balanced. No trades needed.")
     else:
-        print("✅ No meaningful rebalancing required.")
+        trade_plan = []
+        winner_idx = 0
+        slippage_adjustment_note = f" (expect ~{CONFIG['slippage_percent']}% loss on traded volume due to slippage)"
+        
+        for _, loser_row in losers.iterrows():
+            deficit_remaining = -loser_row['delta_usd']
+            
+            while deficit_remaining > CONFIG['min_delta_threshold_usd'] and winner_idx < len(winners):
+                winner_row = winners.iloc[winner_idx]
+                excess_remaining = winner_row['delta_usd']
+                
+                if excess_remaining <= CONFIG['min_delta_threshold_usd']:
+                    winner_idx += 1
+                    continue
+                
+                transfer_usd = min(deficit_remaining, excess_remaining)
+                
+                sell_usd_gross = transfer_usd / (1 - slippage) if CONFIG['route_all_trades_through_main'] else transfer_usd
+                sell_tokens = sell_usd_gross / winner_row['price_usd']
+                buy_tokens = transfer_usd / loser_row['price_usd']
+                
+                trade_plan.append({
+                    'from_symbol': winner_row['symbol'],
+                    'sell_tokens': round(sell_tokens, 8),
+                    'sell_usd_gross': round(sell_usd_gross, 2),
+                    'to_symbol': loser_row['symbol'],
+                    'buy_tokens': round(buy_tokens, 8),
+                    'buy_usd_net': round(transfer_usd, 2),
+                })
+                
+                winners.at[winner_row.name, 'delta_usd'] = excess_remaining - transfer_usd
+                deficit_remaining -= transfer_usd
+                
+                if winners.at[winner_row.name, 'delta_usd'] <= CONFIG['min_delta_threshold_usd']:
+                    winner_idx += 1
+        
+        # Console output (rich with emojis)
+        if trade_plan:
+            print(f"💱 Proposed Trades ({len(trade_plan)} swaps):")
+            for i, trade in enumerate(trade_plan, 1):
+                print(f"   {i:2d}. SELL  {trade['sell_tokens']:>12,.6f} {trade['from_symbol']:8} "
+                      f"(${trade['sell_usd_gross']:,.2f}) → BUY {trade['buy_tokens']:>12,.6f} {trade['to_symbol']}")
+                print(f"          (≈ ${trade['buy_usd_net']:,.2f} net to {trade['to_symbol']}){slippage_adjustment_note}")
+            
+            total_traded = sum(t['sell_usd_gross'] for t in trade_plan)
+            expected_slippage_loss = total_traded * slippage
+            print(f"\n📉 Total volume to trade: ~${total_traded:,.2f}")
+            print(f"   Expected slippage cost: ~${expected_slippage_loss:,.2f} (portfolio value will drop slightly)")
+            print(f"   After rebalance you should be within ~{CONFIG['min_delta_threshold_usd']*2:.0f} USD of targets.")
+            
+            # Clean TXT version (no emojis, only this section)
+            txt_lines.append(f"Proposed Trades ({len(trade_plan)} swaps):")
+            txt_lines.append("")
+            for i, trade in enumerate(trade_plan, 1):
+                line1 = f"   {i:2d}. SELL  {trade['sell_tokens']:>12,.6f} {trade['from_symbol']:8} " \
+                        f"(${trade['sell_usd_gross']:,.2f}) → BUY {trade['buy_tokens']:>12,.6f} {trade['to_symbol']}"
+                line2 = f"          (≈ ${trade['buy_usd_net']:,.2f} net to {trade['to_symbol']}){slippage_adjustment_note}"
+                txt_lines.append(line1)
+                txt_lines.append(line2)
+                txt_lines.append("")
+            
+            txt_lines.append(f"Total volume to trade: ~${total_traded:,.2f}")
+            txt_lines.append(f"Expected slippage cost: ~${expected_slippage_loss:,.2f} (portfolio value will drop slightly)")
+            txt_lines.append(f"After rebalance you should be within ~{CONFIG['min_delta_threshold_usd']*2:.0f} USD of targets.")
+        else:
+            print("✅ No meaningful rebalancing required.")
+            txt_lines.append("No meaningful rebalancing required.")
     
-    # 7. Final notes & implications
-    print("\n" + "="*100)
-    print("💡 IMPORTANT CONSIDERATIONS & EDGE CASES")
-    print("   • Prices are from the snapshot – run this script immediately before executing trades.")
-    print("   • Meme coins have extremely high volatility and often low liquidity. A 1% slippage assumption")
-    print("     may be optimistic for small buys; real slippage can be 5-20%+ on illiquid pairs.")
-    print("   • Equal weighting ignores token-specific fundamentals, market cap, or momentum.")
-    print("   • Edge cases handled: zero holdings, single-token portfolios, tiny deltas, missing files.")
-    print("="*100)
-    print("✅ Rebalance plan complete. Good luck – trade responsibly!")
+    print("\n✅ Rebalance plan complete. Good luck!")
 
+    # === Export ONLY the Proposed Trades section to TXT (same folder as script) ===
+    if CONFIG.get('export_to_txt', True) and txt_lines:
+        try:
+            script_dir = Path(__file__).parent
+            txt_path = script_dir / CONFIG['txt_filename']
+            
+            with open(txt_path, 'w', encoding='utf-8') as f:
+                f.write("\n".join(txt_lines))
+            
+            print(f"\n💾 Clean trades report saved (overwritten) to: {txt_path.name}")
+        except Exception as e:
+            print(f"⚠️  Failed to save TXT report: {e}")
 
 if __name__ == "__main__":
     try:
