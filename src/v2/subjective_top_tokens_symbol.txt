@@ -9,5 +9,4 @@ ltc
 pepe
 etc
 pump
-bonk
 fartcoin
