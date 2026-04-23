@@ -7,16 +7,17 @@ import sys
 # ==================== CONFIG SECTION ====================
 # Edit these values as needed before running the script
 CONFIG = {
-    'main_token_symbol': 'CBBTC',          # Always treated as the "anchor" / main token
-    'target_main_percent': 60.0,           # ← Change this to whatever % you want for CBBTC (e.g. 50.0, 70.0, etc.)
-    'slippage_percent': 1.0,               # Assumed slippage on every trade (buy or sell side)
+    'main_token_symbol': '',           # ← Set to '' (empty string) for EQUAL distribution across ALL tokens.
+                                       #    Any non-empty value (e.g. 'CBBTC') = old "anchor" mode with target_main_percent.
+    'target_main_percent': 60.0,       # Only used when main_token_symbol is non-empty
+    'slippage_percent': 1.0,           # Assumed slippage on every trade (buy or sell side)
     'wallet_data_dir': Path('wallet_data'),  # Folder where your portfolio CSVs live
-    'min_delta_threshold_usd': 10.0,        # Ignore tiny imbalances (< $2) to reduce noise
-    'route_all_trades_through_main': True, # If True, all sells go to CBBTC first, then CBBTC → losers (simpler on Solana)
+    'min_delta_threshold_usd': 10.0,   # Ignore tiny imbalances (< $10) to reduce noise
+    'route_all_trades_through_main': True, # If True, all sells go to main token first (simpler on Solana)
     
     # === TXT Export Configuration ===
     'export_to_txt': True,
-    'txt_filename': 'rebalance_report.txt',   # Fixed name – overwrites every run. Saved in same folder as this script.
+    'txt_filename': 'rebalance_report.txt',   # Fixed name – overwrites every run. Saved next to this script.
 }
 # ======================================================
 
@@ -40,15 +41,15 @@ def load_latest_portfolio(wallet_dir: Path) -> pd.DataFrame:
 
 
 def main():
-    # Optional CLI override for target percent
+    # Optional CLI override for target percent (only relevant in main-token mode)
     parser = argparse.ArgumentParser(description="Solana Meme Portfolio Rebalancer")
     parser.add_argument('--target-cbbtc', type=float, default=None,
-                        help=f"Override CBBTC target % (default: {CONFIG['target_main_percent']})")
+                        help=f"Override main token target % (default: {CONFIG['target_main_percent']})")
     args = parser.parse_args()
     
     if args.target_cbbtc is not None:
         CONFIG['target_main_percent'] = args.target_cbbtc
-        print(f"⚠️  Overrode CBBTC target to {CONFIG['target_main_percent']}% via CLI")
+        print(f"⚠️  Overrode main token target to {CONFIG['target_main_percent']}% via CLI")
 
     # For clean TXT export (trades section only, no emojis)
     txt_lines: list[str] = []
@@ -77,35 +78,51 @@ def main():
     numeric_cols = ['token_count', 'price_usd', 'value_usd', 'portfolio_percent']
     for col in numeric_cols:
         portfolio_df[col] = pd.to_numeric(portfolio_df[col], errors='coerce')
-    
-    main_symbol = CONFIG['main_token_symbol']
+
+    main_symbol = str(CONFIG.get('main_token_symbol', '')).strip()
+    has_main_token = bool(main_symbol)
     slippage = CONFIG['slippage_percent'] / 100.0
-    
-    # 4. Calculate targets
-    other_mask = portfolio_df['symbol'] != main_symbol
-    num_others = int(other_mask.sum())
-    if num_others == 0:
-        print("⚠️  Only CBBTC in portfolio – nothing to rebalance against.")
-        sys.exit(0)
-    
-    remaining_pct = 100.0 - CONFIG['target_main_percent']
-    target_other_pct = remaining_pct / num_others
-    
-    portfolio_df['target_percent'] = 0.0
-    portfolio_df.loc[~other_mask, 'target_percent'] = CONFIG['target_main_percent']
-    portfolio_df.loc[other_mask, 'target_percent'] = target_other_pct
-    
+
+    # === NEW: Equal distribution mode when main_token_symbol is empty ===
+    if not has_main_token:
+        CONFIG['route_all_trades_through_main'] = False  # no main token to route through
+        print("🔄 main_token_symbol is empty → EQUAL DISTRIBUTION MODE")
+        print(f"   All {len(portfolio_df)} tokens will target exactly {100.0 / len(portfolio_df):.2f}% each")
+        
+        portfolio_df['target_percent'] = 100.0 / len(portfolio_df)
+    else:
+        # Original anchor/main token logic
+        other_mask = portfolio_df['symbol'] != main_symbol
+        num_others = int(other_mask.sum())
+        if num_others == 0:
+            print("⚠️  Only the main token in portfolio – nothing to rebalance against.")
+            sys.exit(0)
+        
+        remaining_pct = 100.0 - CONFIG['target_main_percent']
+        target_other_pct = remaining_pct / num_others
+        
+        portfolio_df['target_percent'] = 0.0
+        portfolio_df.loc[~other_mask, 'target_percent'] = CONFIG['target_main_percent']
+        portfolio_df.loc[other_mask, 'target_percent'] = target_other_pct
+
+    # 4. Calculate targets, deltas, etc. (works for BOTH modes)
     portfolio_df['target_usd'] = (total_usd * portfolio_df['target_percent'] / 100.0).round(6)
     portfolio_df['delta_usd'] = (portfolio_df['value_usd'] - portfolio_df['target_usd']).round(6)
     portfolio_df['target_token_count'] = (portfolio_df['target_usd'] / portfolio_df['price_usd']).round(8)
     portfolio_df['delta_tokens'] = (portfolio_df['token_count'] - portfolio_df['target_token_count']).round(8)
     
-    # 5. Full console report (unchanged from previous version)
+    # 5. Full console report
     print("\n" + "="*100)
     print(f"🚀 SOLANA MEME PORTFOLIO REBALANCER")
     print(f"   Snapshot: {csv_path.name} | Total Value: ${total_usd:,.2f} | Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"   Target → CBBTC: {CONFIG['target_main_percent']:.1f}% (${portfolio_df.loc[~other_mask, 'target_usd'].iloc[0]:,.2f})")
-    print(f"   Remaining {remaining_pct:.1f}% split equally across {num_others} other tokens → ~{target_other_pct:.2f}% each (${portfolio_df.loc[other_mask, 'target_usd'].iloc[0]:,.2f} per token)")
+    
+    if has_main_token:
+        print(f"   Target → {main_symbol}: {CONFIG['target_main_percent']:.1f}% "
+              f"(${portfolio_df.loc[portfolio_df['symbol'] == main_symbol, 'target_usd'].iloc[0]:,.2f})")
+        print(f"   Remaining {100 - CONFIG['target_main_percent']:.1f}% split equally across {num_others} other tokens")
+    else:
+        print(f"   EQUAL DISTRIBUTION: {100.0 / len(portfolio_df):.2f}% per token")
+    
     print(f"   Slippage assumption: {CONFIG['slippage_percent']}% per trade side")
     print("="*100)
     
@@ -116,12 +133,11 @@ def main():
     print("\n📊 CURRENT vs TARGET ALLOCATION")
     print(portfolio_df[display_cols].round(4).to_string(index=False))
     
-    # 6. Greedy rebalance algorithm
+    # 6. Greedy rebalance algorithm (unchanged – works for both modes)
     print("\n🔄 EXACT REBALANCE TRADES (Greedy Pairing)")
     print("   Strategy: Sort biggest winners (over-allocated) and biggest losers (under-allocated).")
     print("             Redistribute from winner → loser starting with the largest deficit.")
-    print("             All trades are planned at current snapshot prices.")
-    print("             CBBTC is treated as the main routing token when possible.\n")
+    print("             All trades are planned at current snapshot prices.\n")
     
     winners = portfolio_df[portfolio_df['delta_usd'] > CONFIG['min_delta_threshold_usd']].copy()
     losers = portfolio_df[portfolio_df['delta_usd'] < -CONFIG['min_delta_threshold_usd']].copy()
@@ -150,6 +166,7 @@ def main():
                 
                 transfer_usd = min(deficit_remaining, excess_remaining)
                 
+                # Slippage gross-up only if routing through main (disabled in equal mode)
                 sell_usd_gross = transfer_usd / (1 - slippage) if CONFIG['route_all_trades_through_main'] else transfer_usd
                 sell_tokens = sell_usd_gross / winner_row['price_usd']
                 buy_tokens = transfer_usd / loser_row['price_usd']
@@ -169,7 +186,7 @@ def main():
                 if winners.at[winner_row.name, 'delta_usd'] <= CONFIG['min_delta_threshold_usd']:
                     winner_idx += 1
         
-        # Console output (rich with emojis)
+        # Console + TXT output (unchanged)
         if trade_plan:
             print(f"💱 Proposed Trades ({len(trade_plan)} swaps):")
             for i, trade in enumerate(trade_plan, 1):
@@ -183,7 +200,7 @@ def main():
             print(f"   Expected slippage cost: ~${expected_slippage_loss:,.2f} (portfolio value will drop slightly)")
             print(f"   After rebalance you should be within ~{CONFIG['min_delta_threshold_usd']*2:.0f} USD of targets.")
             
-            # Clean TXT version (no emojis, only this section)
+            # Clean TXT version
             txt_lines.append(f"Proposed Trades ({len(trade_plan)} swaps):")
             txt_lines.append("")
             for i, trade in enumerate(trade_plan, 1):
@@ -203,7 +220,7 @@ def main():
     
     print("\n✅ Rebalance plan complete. Good luck!")
 
-    # === Export ONLY the Proposed Trades section to TXT (same folder as script) ===
+    # === Export ONLY the Proposed Trades section to TXT ===
     if CONFIG.get('export_to_txt', True) and txt_lines:
         try:
             script_dir = Path(__file__).parent

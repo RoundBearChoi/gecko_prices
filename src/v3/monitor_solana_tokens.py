@@ -19,8 +19,9 @@ CONFIG = {
     "CSV_FILENAME_TEMPLATE": "solana_meme_portfolio_{timestamp}.csv",
     "INCLUDE_MINT_IN_CSV": True,
     "SLIPPAGE_PERCENT": 1.0,
-    "PRIORITY_TOKEN_SYMBOL": "cbbtc",          # Symbol for the priority token (case-insensitive)
-    "PRIORITY_TARGET_PCT": 60.0,               # Target % for the priority token. Remaining % split equally among other held included tokens.
+    "PRIORITY_TOKEN_SYMBOL": "",               # ← If empty (""), equal distribution among ALL held included tokens.
+                                               #    Otherwise = priority token (old behavior).
+    "PRIORITY_TARGET_PCT": 60.0,               # Only used when PRIORITY_TOKEN_SYMBOL is set.
 }
 # =======================================================
 
@@ -205,9 +206,10 @@ def get_starting_snapshot(gecko_id: str) -> dict | None:
 
 
 def main():
-    print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC + Priority Rebalance + Slippage + include_in_portfolio) ===\n")
+    print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC + Priority/EQUAL Rebalance + Slippage + include_in_portfolio) ===\n")
     print("Now supports BOTH Token and Token-2022 programs (modern standard)")
     print("equivalent_tokens_if_all_swapped = keep your own holdings + sell all other included tokens into this one (after slippage)\n")
+    
     wallet = input("Enter your Solana wallet address: ").strip()
     if not wallet:
         print("No wallet address provided. Exiting.")
@@ -267,8 +269,6 @@ def main():
         })
 
     # ====================== UPDATED EQUIVALENT LOGIC ======================
-    # equivalent_tokens_if_all_swapped = current balance of THIS token
-    # + (value of ALL OTHER included tokens * SLIPPAGE_FACTOR) / this token's price
     if total_usd > 0:
         for item in portfolio:
             if item["include_in_portfolio"] and item["price_usd"] > Decimal("0"):
@@ -280,7 +280,6 @@ def main():
                     additional_tokens = effective_proceeds_from_others / item["price_usd"]
                     item["equivalent"] = item["balance"] + additional_tokens
                 else:
-                    # Only this token is held → no slippage
                     item["equivalent"] = item["balance"]
             else:
                 item["percent"] = Decimal("0")
@@ -457,53 +456,66 @@ def main():
     else:
         print("No starting price data found in the _starting_points.csv files for included tokens.")
 
-    # ====================== Suggested Rebalance (Priority Token Logic) ======================
-    print("\n=== 🔄 Suggested Rebalance (Priority Token + Equal Others) ===")
+    # ====================== Suggested Rebalance (Priority OR Equal Distribution) ======================
+    print("\n=== 🔄 Suggested Rebalance (Priority OR Equal Distribution) ===")
     
-    held_tokens = [item for item in portfolio if item["balance"] > Decimal("0") and item["include_in_portfolio"]]
+    held_included = [item for item in portfolio if item["balance"] > Decimal("0") and item["include_in_portfolio"]]
     all_included = [item for item in portfolio if item["include_in_portfolio"]]
-    
-    priority_symbol_lower = CONFIG.get("PRIORITY_TOKEN_SYMBOL", "cbbtc").lower()
-    priority_target_pct_float = CONFIG.get("PRIORITY_TARGET_PCT", 50.0)
-    priority_target_pct = Decimal(str(priority_target_pct_float))
-    
-    if priority_target_pct > Decimal("100"):
-        priority_target_pct = Decimal("100")
-    
-    remaining_pct = Decimal("100") - priority_target_pct
-    
-    # Find priority item (even if currently zero balance)
-    priority_item = next((item for item in all_included if item["symbol"].lower() == priority_symbol_lower), None)
-    
-    # Other held tokens (exclude priority)
-    other_held = [item for item in held_tokens if item["symbol"].lower() != priority_symbol_lower]
-    num_other_held = len(other_held)
-    
-    if num_other_held > 0:
-        other_target_pct = remaining_pct / Decimal(num_other_held)
-    else:
-        other_target_pct = Decimal("0")
-    
-    # Calculate target USD
+
+    # === MODE DETECTION ===
+    priority_symbol = CONFIG.get("PRIORITY_TOKEN_SYMBOL", "").strip()
+    use_priority_mode = bool(priority_symbol)
+    priority_symbol_lower = priority_symbol.lower() if use_priority_mode else ""
+
     target_usds = {}
-    if priority_item:
-        target_usds[priority_item["symbol"]] = (priority_target_pct / Decimal("100")) * total_usd
-    for item in other_held:
-        target_usds[item["symbol"]] = (other_target_pct / Decimal("100")) * total_usd
-    
-    # Tokens to show in rebalance table (held + priority even if zero)
-    rebalance_tokens = held_tokens[:]
-    if priority_item and priority_item["balance"] <= Decimal("0") and priority_item["symbol"] not in [t["symbol"] for t in rebalance_tokens]:
-        rebalance_tokens.append(priority_item)
-    
+    rebalance_tokens = held_included[:]
+
+    if use_priority_mode:
+        # === PRIORITY MODE (original behavior) ===
+        priority_target_pct_float = CONFIG.get("PRIORITY_TARGET_PCT", 50.0)
+        priority_target_pct = Decimal(str(priority_target_pct_float))
+        if priority_target_pct > Decimal("100"):
+            priority_target_pct = Decimal("100")
+        remaining_pct = Decimal("100") - priority_target_pct
+
+        priority_item = next((item for item in all_included if item["symbol"].lower() == priority_symbol_lower), None)
+        other_held = [item for item in held_included if item["symbol"].lower() != priority_symbol_lower]
+        num_other_held = len(other_held)
+
+        if num_other_held > 0:
+            other_target_pct = remaining_pct / Decimal(num_other_held)
+        else:
+            other_target_pct = Decimal("0")
+
+        if priority_item:
+            target_usds[priority_item["symbol"]] = (priority_target_pct / Decimal("100")) * total_usd
+        for item in other_held:
+            target_usds[item["symbol"]] = (other_target_pct / Decimal("100")) * total_usd
+
+        if priority_item and priority_item["balance"] <= Decimal("0") and priority_item["symbol"] not in [t["symbol"] for t in rebalance_tokens]:
+            rebalance_tokens.append(priority_item)
+
+        mode_description = f"📌 Priority: {priority_symbol.upper()} targeting {float(priority_target_pct):.1f}%"
+        if num_other_held > 0:
+            mode_description += f"\n   Remaining {float(remaining_pct):.1f}% split equally among {num_other_held} other held tokens (~{float(other_target_pct):.2f}% each)"
+        else:
+            mode_description += "\n   No other held tokens - full allocation goes to priority token."
+    else:
+        # === EQUAL DISTRIBUTION MODE (your new request) ===
+        num_held = len(held_included)
+        if num_held > 0:
+            equal_target_pct = Decimal("100") / Decimal(num_held)
+            for item in held_included:
+                target_usds[item["symbol"]] = (equal_target_pct / Decimal("100")) * total_usd
+        else:
+            equal_target_pct = Decimal("0")
+        mode_description = f"📌 Equal distribution among {num_held} held included tokens (~{float(equal_target_pct):.2f}% each)"
+
+    # Display the rebalance table
     if total_usd < Decimal("10") or len(rebalance_tokens) < 1:
         print("Portfolio value too low or no tokens to rebalance.")
     else:
-        print(f"📌 Priority: {CONFIG['PRIORITY_TOKEN_SYMBOL'].upper()} targeting {float(priority_target_pct):.1f}%")
-        if num_other_held > 0:
-            print(f"   Remaining {float(remaining_pct):.1f}% split equally among {num_other_held} other held tokens (~{float(other_target_pct):.2f}% each)")
-        else:
-            print("   No other held tokens - full allocation goes to priority token.")
+        print(mode_description)
         
         print(f"\n{'Symbol':>12} | {'Current $':>14} | {'Current %':>9} | {'Action':>8} | {'USD Δ (gross)':>16} | {'Tokens Δ':>18}")
         print("-" * 92)
@@ -542,7 +554,6 @@ def main():
         
         print("-" * 92)
         
-        # === NEW: Show total gross sell volume as % of portfolio ===
         if total_usd > Decimal("0"):
             sell_percentage = (total_sell_usd_gross / total_usd) * Decimal("100")
             pct_str = f" ({float(sell_percentage):.2f}% of portfolio)"
