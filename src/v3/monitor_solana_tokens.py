@@ -22,6 +22,7 @@ CONFIG = {
     "PRIORITY_TOKEN_SYMBOL": "",               # ← If empty (""), equal distribution among ALL held included tokens.
                                                #    Otherwise = priority token (old behavior).
     "PRIORITY_TARGET_PCT": 60.0,               # Only used when PRIORITY_TOKEN_SYMBOL is set.
+    "MONERO_GECKO_ID": "monero",               # CoinGecko ID for Monero (XMR) - used for the new monero_equivalent column
 }
 # =======================================================
 
@@ -206,9 +207,10 @@ def get_starting_snapshot(gecko_id: str) -> dict | None:
 
 
 def main():
-    print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC + Priority/EQUAL Rebalance + Slippage + include_in_portfolio) ===\n")
+    print("=== Solana Meme Coin Portfolio Tracker (CoinGecko + RPC + Priority/EQUAL Rebalance + Slippage + include_in_portfolio + Monero Equivalent) ===\n")
     print("Now supports BOTH Token and Token-2022 programs (modern standard)")
-    print("equivalent_tokens_if_all_swapped = keep your own holdings + sell all other included tokens into this one (after slippage)\n")
+    print("equivalent_tokens_if_all_swapped = keep your own holdings + sell all other included tokens into this one (after slippage)")
+    print("monero_equivalent               = current USD value converted to XMR at live CoinGecko price (no slippage)\n")
     
     wallet = input("Enter your Solana wallet address: ").strip()
     if not wallet:
@@ -218,8 +220,19 @@ def main():
     tokens = load_tokens()
     gecko_ids = [t["id"] for t in tokens]
 
+    # === NEW: Always fetch Monero price for the new column ===
+    gecko_ids_with_monero = gecko_ids + [CONFIG["MONERO_GECKO_ID"]]
+    # Remove duplicates just in case user already tracks Monero
+    gecko_ids_with_monero = list(dict.fromkeys(gecko_ids_with_monero))
+
     print("\nFetching USD prices from CoinGecko (free tier)...")
-    prices = get_prices(gecko_ids)
+    prices = get_prices(gecko_ids_with_monero)
+    monero_price = prices.get(CONFIG["MONERO_GECKO_ID"], Decimal("0"))
+    if monero_price > 0:
+        print(f"✅ Monero (XMR) price fetched: ${monero_price:,.4f} USD")
+    else:
+        print("⚠️  Warning: Could not fetch Monero price - monero_equivalent column will be 0")
+    # ========================================================
 
     print("Fetching token balances from Solana RPC (Token + Token-2022)...")
     try:
@@ -265,6 +278,8 @@ def main():
             "balance": balance,
             "price_usd": price,
             "value_usd": value_usd,
+            "monero_price_usd": monero_price,                    # ← NEW: same value for every row (transparency)
+            "monero_equivalent": (value_usd / monero_price) if monero_price > 0 else Decimal("0"),  # ← NEW: XMR equivalent
             "include_in_portfolio": include_in_portfolio,
         })
 
@@ -302,6 +317,8 @@ def main():
     fieldnames = [
         "timestamp_kst", "total_usd", "gecko_id", "symbol", "mint", "token_count",
         "price_usd", "value_usd", "portfolio_percent", "equivalent_tokens_if_all_swapped",
+        "monero_price_usd",           # ← NEW: shows the exact Monero price used in the calculation
+        "monero_equivalent",          # ← NEW column right next to equivalent_tokens_if_all_swapped
         "include_in_portfolio"
     ]
 
@@ -321,8 +338,13 @@ def main():
                 "value_usd": str(item["value_usd"]),
                 "portfolio_percent": f"{item.get('percent', 0):.8f}",
                 "equivalent_tokens_if_all_swapped": str(item.get("equivalent", 0)),
+                "monero_price_usd": str(item.get("monero_price_usd", 0)),      # ← NEW
+                "monero_equivalent": str(item.get("monero_equivalent", 0)),    # ← NEW
                 "include_in_portfolio": str(item["include_in_portfolio"]).lower()
             })
+
+        # Calculate total Monero equivalent for the TOTAL row
+        total_monero_equiv = (total_usd / monero_price) if monero_price > 0 else Decimal("0")
 
         # TOTAL row
         writer.writerow({
@@ -336,6 +358,8 @@ def main():
             "value_usd": str(total_usd),
             "portfolio_percent": "100",
             "equivalent_tokens_if_all_swapped": "",
+            "monero_price_usd": str(monero_price),           # ← NEW (same price for TOTAL row)
+            "monero_equivalent": str(total_monero_equiv),    # ← NEW
             "include_in_portfolio": "true"
         })
 
@@ -588,10 +612,10 @@ def main():
         print('{\n  "date": "2026-04-19",\n  "usd": 2450.75\n}')
         print("Then run the script again.")
 
-    # Final summary
+    # Final summary (with optional polish)
     included_count = sum(1 for t in portfolio if t["include_in_portfolio"])
     print(f"\n✅ Portfolio snapshot saved to: {csv_path}")
-    print(f"   Total portfolio value (included tokens): ${total_usd:,.8f} USD")
+    print(f"   Total portfolio value (included tokens): ${total_usd:,.8f} USD  →  {float(total_monero_equiv):,.8f} XMR equivalent")
     print(f"   Time (KST): {timestamp_str}")
     print(f"   Tokens tracked: {included_count} included / {len(portfolio)} total")
 

@@ -1,47 +1,47 @@
 Proposed Trades (14 swaps):
 
-    1. SELL      0.003202 CBBTC    ($249.46) → BUY 8,108.507719 NEET
-          (≈ $249.46 net to NEET) (expect ~1.0% loss on traded volume due to slippage)
+    1. SELL      0.003102 CBBTC    ($241.30) → BUY 1,363.794196 MET
+          (≈ $241.30 net to MET) (expect ~1.0% loss on traded volume due to slippage)
 
-    2. SELL      0.003202 CBBTC    ($249.46) → BUY 11,562.489739 TROLL
-          (≈ $249.46 net to TROLL) (expect ~1.0% loss on traded volume due to slippage)
+    2. SELL      0.003101 CBBTC    ($241.27) → BUY     0.765621 ZEC
+          (≈ $241.27 net to ZEC) (expect ~1.0% loss on traded volume due to slippage)
 
-    3. SELL      0.003202 CBBTC    ($249.46) → BUY 138,616.174902 PUMP
-          (≈ $249.46 net to PUMP) (expect ~1.0% loss on traded volume due to slippage)
+    3. SELL      0.003101 CBBTC    ($241.27) → BUY     5.903265 HYPE
+          (≈ $241.27 net to HYPE) (expect ~1.0% loss on traded volume due to slippage)
 
-    4. SELL      0.003202 CBBTC    ($249.46) → BUY 12,540.743368 KMNO
-          (≈ $249.46 net to KMNO) (expect ~1.0% loss on traded volume due to slippage)
+    4. SELL      0.003101 CBBTC    ($241.27) → BUY   366.822018 RAY
+          (≈ $241.27 net to RAY) (expect ~1.0% loss on traded volume due to slippage)
 
-    5. SELL      0.003202 CBBTC    ($249.46) → BUY 1,367.851672 MET
-          (≈ $249.46 net to MET) (expect ~1.0% loss on traded volume due to slippage)
+    5. SELL      0.003101 CBBTC    ($241.26) → BUY 134,008.418270 PUMP
+          (≈ $241.26 net to PUMP) (expect ~1.0% loss on traded volume due to slippage)
 
-    6. SELL      0.003202 CBBTC    ($249.46) → BUY     0.792035 ZEC
-          (≈ $249.46 net to ZEC) (expect ~1.0% loss on traded volume due to slippage)
+    6. SELL      0.003101 CBBTC    ($241.26) → BUY 1,423.357912 JUP
+          (≈ $241.26 net to JUP) (expect ~1.0% loss on traded volume due to slippage)
 
-    7. SELL      0.003202 CBBTC    ($249.46) → BUY     6.106713 HYPE
-          (≈ $249.46 net to HYPE) (expect ~1.0% loss on traded volume due to slippage)
+    7. SELL      0.003101 CBBTC    ($241.26) → BUY 12,119.742100 KMNO
+          (≈ $241.26 net to KMNO) (expect ~1.0% loss on traded volume due to slippage)
 
-    8. SELL      0.003202 CBBTC    ($249.46) → BUY   378.969328 RAY
-          (≈ $249.46 net to RAY) (expect ~1.0% loss on traded volume due to slippage)
+    8. SELL      0.003100 CBBTC    ($241.20) → BUY 11,103.351800 TROLL
+          (≈ $241.20 net to TROLL) (expect ~1.0% loss on traded volume due to slippage)
 
-    9. SELL      0.003202 CBBTC    ($249.46) → BUY 1,474.005477 JUP
-          (≈ $249.46 net to JUP) (expect ~1.0% loss on traded volume due to slippage)
+    9. SELL      0.003099 CBBTC    ($241.14) → BUY 7,774.511049 NEET
+          (≈ $241.14 net to NEET) (expect ~1.0% loss on traded volume due to slippage)
 
-   10. SELL      0.003093 CBBTC    ($240.95) → BUY 5,929.318382 USELESS
-          (≈ $240.95 net to USELESS) (expect ~1.0% loss on traded volume due to slippage)
+   10. SELL      0.003092 CBBTC    ($240.53) → BUY 5,914.075528 USELESS
+          (≈ $240.53 net to USELESS) (expect ~1.0% loss on traded volume due to slippage)
 
-   11. SELL      0.003089 CBBTC    ($240.63) → BUY 1,226.395251 FARTCOIN
-          (≈ $240.63 net to FARTCOIN) (expect ~1.0% loss on traded volume due to slippage)
+   11. SELL      0.003088 CBBTC    ($240.21) → BUY 1,225.081401 FARTCOIN
+          (≈ $240.21 net to FARTCOIN) (expect ~1.0% loss on traded volume due to slippage)
 
-   12. SELL      0.003089 CBBTC    ($240.61) → BUY 4,109.675753 POPCAT
-          (≈ $240.61 net to POPCAT) (expect ~1.0% loss on traded volume due to slippage)
+   12. SELL      0.003087 CBBTC    ($240.20) → BUY 4,104.531254 POPCAT
+          (≈ $240.20 net to POPCAT) (expect ~1.0% loss on traded volume due to slippage)
 
-   13. SELL      0.003076 CBBTC    ($239.65) → BUY     0.101981 ETH
-          (≈ $239.65 net to ETH) (expect ~1.0% loss on traded volume due to slippage)
+   13. SELL      0.003075 CBBTC    ($239.25) → BUY     0.102027 ETH
+          (≈ $239.25 net to ETH) (expect ~1.0% loss on traded volume due to slippage)
 
-   14. SELL      0.002827 CBBTC    ($220.25) → BUY     2.564282 SOL
-          (≈ $220.25 net to SOL) (expect ~1.0% loss on traded volume due to slippage)
+   14. SELL      0.002846 CBBTC    ($221.45) → BUY     2.577949 SOL
+          (≈ $221.45 net to SOL) (expect ~1.0% loss on traded volume due to slippage)
 
-Total volume to trade: ~$3,427.23
-Expected slippage cost: ~$34.27 (portfolio value will drop slightly)
+Total volume to trade: ~$3,352.87
+Expected slippage cost: ~$33.53 (portfolio value will drop slightly)
 After rebalance you should be within ~20 USD of targets.
