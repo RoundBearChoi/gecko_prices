@@ -77,7 +77,8 @@ def load_tokens() -> list[dict]:
 
 
 def load_usd_starting_point() -> dict | None:
-    """Load manual overall portfolio USD starting point from usd_starting_point.json."""
+    """Load manual overall portfolio USD starting point from usd_starting_point.json.
+    Now supports optional monero_equivalent and monero_price_usd for XMR tracking."""
     file_path = Path(CONFIG["USD_STARTING_POINT_FILE"])
     if not file_path.exists():
         return None
@@ -92,7 +93,22 @@ def load_usd_starting_point() -> dict | None:
             return None
 
         usd = Decimal(str(usd_value))
-        return {"date": date, "usd": usd}
+        result = {"date": date, "usd": usd}
+
+        # NEW: Monero fields (optional - user updates JSON manually)
+        if "monero_equivalent" in data and data["monero_equivalent"] is not None:
+            try:
+                result["monero_equivalent"] = Decimal(str(data["monero_equivalent"]))
+                # No console print (kept clean as requested)
+            except Exception as e:
+                print(f"Warning: Invalid 'monero_equivalent' in {CONFIG['USD_STARTING_POINT_FILE']}: {e}")
+        if "monero_price_usd" in data and data["monero_price_usd"] is not None:
+            try:
+                result["monero_price_usd"] = Decimal(str(data["monero_price_usd"]))
+            except Exception as e:
+                print(f"Warning: Invalid 'monero_price_usd' in {CONFIG['USD_STARTING_POINT_FILE']}: {e}")
+
+        return result
     except Exception as e:
         print(f"Warning: Failed to load {CONFIG['USD_STARTING_POINT_FILE']}: {e}")
         return None
@@ -220,9 +236,8 @@ def main():
     tokens = load_tokens()
     gecko_ids = [t["id"] for t in tokens]
 
-    # === NEW: Always fetch Monero price for the new column ===
+    # === Always fetch Monero price for the new column ===
     gecko_ids_with_monero = gecko_ids + [CONFIG["MONERO_GECKO_ID"]]
-    # Remove duplicates just in case user already tracks Monero
     gecko_ids_with_monero = list(dict.fromkeys(gecko_ids_with_monero))
 
     print("\nFetching USD prices from CoinGecko (free tier)...")
@@ -232,7 +247,6 @@ def main():
         print(f"✅ Monero (XMR) price fetched: ${monero_price:,.4f} USD")
     else:
         print("⚠️  Warning: Could not fetch Monero price - monero_equivalent column will be 0")
-    # ========================================================
 
     print("Fetching token balances from Solana RPC (Token + Token-2022)...")
     try:
@@ -243,7 +257,7 @@ def main():
         print("Tip: Public RPCs are rate-limited. Consider a free Helius/Ankr RPC key in CONFIG.")
         return
 
-    # Build portfolio data for ALL tokens, but only sum included ones
+    # Build portfolio data
     portfolio = []
     total_usd = Decimal("0")
 
@@ -278,17 +292,16 @@ def main():
             "balance": balance,
             "price_usd": price,
             "value_usd": value_usd,
-            "monero_price_usd": monero_price,                    # ← NEW: same value for every row (transparency)
-            "monero_equivalent": (value_usd / monero_price) if monero_price > 0 else Decimal("0"),  # ← NEW: XMR equivalent
+            "monero_price_usd": monero_price,
+            "monero_equivalent": (value_usd / monero_price) if monero_price > 0 else Decimal("0"),
             "include_in_portfolio": include_in_portfolio,
         })
 
-    # ====================== UPDATED EQUIVALENT LOGIC ======================
+    # Updated equivalent logic
     if total_usd > 0:
         for item in portfolio:
             if item["include_in_portfolio"] and item["price_usd"] > Decimal("0"):
                 item["percent"] = (item["value_usd"] / total_usd) * Decimal("100")
-
                 other_value_usd = total_usd - item["value_usd"]
                 if other_value_usd > Decimal("0"):
                     effective_proceeds_from_others = other_value_usd * SLIPPAGE_FACTOR
@@ -317,9 +330,7 @@ def main():
     fieldnames = [
         "timestamp_kst", "total_usd", "gecko_id", "symbol", "mint", "token_count",
         "price_usd", "value_usd", "portfolio_percent", "equivalent_tokens_if_all_swapped",
-        "monero_price_usd",           # ← NEW: shows the exact Monero price used in the calculation
-        "monero_equivalent",          # ← NEW column right next to equivalent_tokens_if_all_swapped
-        "include_in_portfolio"
+        "monero_price_usd", "monero_equivalent", "include_in_portfolio"
     ]
 
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
@@ -338,15 +349,13 @@ def main():
                 "value_usd": str(item["value_usd"]),
                 "portfolio_percent": f"{item.get('percent', 0):.8f}",
                 "equivalent_tokens_if_all_swapped": str(item.get("equivalent", 0)),
-                "monero_price_usd": str(item.get("monero_price_usd", 0)),      # ← NEW
-                "monero_equivalent": str(item.get("monero_equivalent", 0)),    # ← NEW
+                "monero_price_usd": str(item.get("monero_price_usd", 0)),
+                "monero_equivalent": str(item.get("monero_equivalent", 0)),
                 "include_in_portfolio": str(item["include_in_portfolio"]).lower()
             })
 
-        # Calculate total Monero equivalent for the TOTAL row
         total_monero_equiv = (total_usd / monero_price) if monero_price > 0 else Decimal("0")
 
-        # TOTAL row
         writer.writerow({
             "timestamp_kst": timestamp_str,
             "total_usd": str(total_usd),
@@ -358,8 +367,8 @@ def main():
             "value_usd": str(total_usd),
             "portfolio_percent": "100",
             "equivalent_tokens_if_all_swapped": "",
-            "monero_price_usd": str(monero_price),           # ← NEW (same price for TOTAL row)
-            "monero_equivalent": str(total_monero_equiv),    # ← NEW
+            "monero_price_usd": str(monero_price),
+            "monero_equivalent": str(total_monero_equiv),
             "include_in_portfolio": "true"
         })
 
@@ -391,14 +400,13 @@ def main():
                   f"{item['balance']:>18,.8f} | "
                   f"${item['value_usd']:>14,.4f}  [EXCLUDED]")
 
-    # ====================== Starting Equivalent Tokens Comparison ======================
+    # Starting Equivalent Tokens Comparison
     print("\n=== 📈 Starting Equivalent Tokens Comparison ===")
     print("   (Keep your current holdings of this token + sell all other included tokens into it after slippage)")
     print(f"{'Symbol':>12} | {'Current Equiv':>22} | {'Starting Equiv':>22} | {'Delta Equiv':>22} | {'Delta USD':>19} | {'% Change':>12}")
     print("-" * 120)
 
     comparison_data = []
-
     for item in portfolio:
         if not item["include_in_portfolio"]:
             continue
@@ -423,7 +431,6 @@ def main():
             })
 
     comparison_data.sort(key=lambda x: x["delta_usd"])
-
     if comparison_data:
         for data in comparison_data:
             print(f"{data['symbol']:>12} | "
@@ -435,9 +442,8 @@ def main():
     else:
         print("No starting point CSV files found for included tokens.")
 
-    # ====================== PRICE PERFORMANCE ======================
+    # Price Performance
     print("\n=== 📉 Price Performance vs Starting Point ===")
-
     price_performance = []
     for item in portfolio:
         if not item["include_in_portfolio"]:
@@ -461,16 +467,13 @@ def main():
 
     if price_performance:
         price_performance.sort(key=lambda x: x["pct_change"], reverse=True)
-
         print(f"{'Symbol':>12} | {'Current Price':>19} | {'Starting Price':>19} | {'Price Δ':>17} | {'% Change':>12} | {'Start Date':>12}")
         print("-" * 106)
-
         for perf in price_performance:
             current_str = f"${perf['current_p']:,.6f}"
             start_str = f"${perf['start_p']:,.6f}"
             delta_str = f"${perf['delta_p']:,.6f}"
             pct_str = f"{float(perf['pct_change']):+8.2f}%"
-
             print(f"{perf['symbol']:>12} | "
                   f"{current_str:>19} | "
                   f"{start_str:>19} | "
@@ -480,13 +483,11 @@ def main():
     else:
         print("No starting price data found in the _starting_points.csv files for included tokens.")
 
-    # ====================== Suggested Rebalance (Priority OR Equal Distribution) ======================
+    # ====================== Suggested Rebalance ======================
     print("\n=== 🔄 Suggested Rebalance (Priority OR Equal Distribution) ===")
-    
     held_included = [item for item in portfolio if item["balance"] > Decimal("0") and item["include_in_portfolio"]]
     all_included = [item for item in portfolio if item["include_in_portfolio"]]
 
-    # === MODE DETECTION ===
     priority_symbol = CONFIG.get("PRIORITY_TOKEN_SYMBOL", "").strip()
     use_priority_mode = bool(priority_symbol)
     priority_symbol_lower = priority_symbol.lower() if use_priority_mode else ""
@@ -495,7 +496,7 @@ def main():
     rebalance_tokens = held_included[:]
 
     if use_priority_mode:
-        # === PRIORITY MODE (original behavior) ===
+        # PRIORITY MODE
         priority_target_pct_float = CONFIG.get("PRIORITY_TARGET_PCT", 50.0)
         priority_target_pct = Decimal(str(priority_target_pct_float))
         if priority_target_pct > Decimal("100"):
@@ -525,7 +526,7 @@ def main():
         else:
             mode_description += "\n   No other held tokens - full allocation goes to priority token."
     else:
-        # === EQUAL DISTRIBUTION MODE (your new request) ===
+        # EQUAL DISTRIBUTION MODE (fixed line below)
         num_held = len(held_included)
         if num_held > 0:
             equal_target_pct = Decimal("100") / Decimal(num_held)
@@ -535,12 +536,10 @@ def main():
             equal_target_pct = Decimal("0")
         mode_description = f"📌 Equal distribution among {num_held} held included tokens (~{float(equal_target_pct):.2f}% each)"
 
-    # Display the rebalance table
     if total_usd < Decimal("10") or len(rebalance_tokens) < 1:
         print("Portfolio value too low or no tokens to rebalance.")
     else:
         print(mode_description)
-        
         print(f"\n{'Symbol':>12} | {'Current $':>14} | {'Current %':>9} | {'Action':>8} | {'USD Δ (gross)':>16} | {'Tokens Δ':>18}")
         print("-" * 92)
         
@@ -552,7 +551,6 @@ def main():
             current_usd = item["value_usd"]
             target_usd = target_usds.get(symbol, Decimal("0"))
             delta_usd = current_usd - target_usd
-            
             price = item["price_usd"]
             tokens_delta = delta_usd / price if price > Decimal("0") else Decimal("0")
             
@@ -577,18 +575,16 @@ def main():
             print(f"{sym:>12} | ${val:>12,.4f} | {float(pct):>8.2f}% | {act:>8} | {usd_d:>16} | {tok_d:>18}")
         
         print("-" * 92)
-        
         if total_usd > Decimal("0"):
             sell_percentage = (total_sell_usd_gross / total_usd) * Decimal("100")
             pct_str = f" ({float(sell_percentage):.2f}% of portfolio)"
         else:
             pct_str = ""
-        
         print(f"💰 Total gross sell volume: ~${total_sell_usd_gross:,.4f} USD{pct_str}")
         print(f"   Expected after {SLIPPAGE_PCT}% slippage: ~${total_sell_usd_gross * SLIPPAGE_FACTOR:,.4f} USD")
 
-    # ====================== Overall Portfolio USD vs Manual Starting Point ======================
-    print("\n=== 💵 Overall Portfolio USD Performance vs Manual Starting Point ===")
+    # ====================== Overall Portfolio Performance vs Manual Starting Point ======================
+    print("\n=== 💵 Overall Portfolio Performance vs Manual Starting Point ===")
     starting_point = load_usd_starting_point()
     if starting_point:
         start_date = starting_point["date"]
@@ -596,24 +592,49 @@ def main():
         delta_usd = total_usd - start_usd
 
         if start_usd > 0:
-            pct_change = (delta_usd / start_usd) * Decimal("100")
-            pct_str = f"{float(pct_change):+.2f}%"
+            pct_change_usd = (delta_usd / start_usd) * Decimal("100")
+            pct_str_usd = f"{float(pct_change_usd):+.2f}%"
         else:
-            pct_str = "N/A"
+            pct_str_usd = "N/A"
 
-        print(f"Starting Date : {start_date}")
-        print(f"Starting USD  : ${start_usd:,.2f}")
-        print(f"Current USD   : ${total_usd:,.2f}")
-        print(f"Delta         : ${delta_usd:+,.2f}")
-        print(f"% Change      : {pct_str}")
+        print(f"Starting Date      : {start_date}")
+        print(f"Starting USD       : ${start_usd:,.2f}")
+        print(f"Current USD        : ${total_usd:,.2f}")
+        print(f"Delta USD          : ${delta_usd:+,.2f}")
+        print(f"% Change (USD)     : {pct_str_usd}")
+
+        # Monero equivalents delta
+        monero_start = starting_point.get("monero_equivalent")
+        if monero_start is not None and monero_price > 0:
+            current_monero = (total_usd / monero_price) if monero_price > 0 else Decimal("0")
+            delta_monero = current_monero - monero_start
+
+            if monero_start > 0:
+                pct_change_monero = (delta_monero / monero_start) * Decimal("100")
+                pct_str_monero = f"{float(pct_change_monero):+.2f}%"
+            else:
+                pct_str_monero = "N/A"
+
+            print("\n--- Monero Equivalent Performance ---")
+            print(f"Starting XMR Equiv : {float(monero_start):,.8f} XMR")
+            print(f"Current XMR Equiv  : {float(current_monero):,.8f} XMR")
+            print(f"Delta XMR          : {float(delta_monero):+,.8f} XMR")
+            print(f"% Change (XMR)     : {pct_str_monero}")
+
+            if starting_point.get("monero_price_usd") is not None:
+                print(f"Starting XMR Price : ${float(starting_point['monero_price_usd']):,.4f}")
+            print(f"Current XMR Price  : ${float(monero_price):,.4f} USD")
+        else:
+            print("\n(No monero_equivalent found in starting point JSON. Add it manually for XMR delta tracking.)")
     else:
         print("No usd_starting_point.json found (or it could not be read).")
         print("Create the file with this exact format:")
-        print('{\n  "date": "2026-04-19",\n  "usd": 2450.75\n}')
+        print('{\n  "date": "2026-04-24",\n  "usd": 3500.00,\n  "monero_equivalent": 14.56789012,\n  "monero_price_usd": 240.35\n}')
         print("Then run the script again.")
 
-    # Final summary (with optional polish)
+    # Final summary
     included_count = sum(1 for t in portfolio if t["include_in_portfolio"])
+    total_monero_equiv = (total_usd / monero_price) if monero_price > 0 else Decimal("0")
     print(f"\n✅ Portfolio snapshot saved to: {csv_path}")
     print(f"   Total portfolio value (included tokens): ${total_usd:,.8f} USD  →  {float(total_monero_equiv):,.8f} XMR equivalent")
     print(f"   Time (KST): {timestamp_str}")
