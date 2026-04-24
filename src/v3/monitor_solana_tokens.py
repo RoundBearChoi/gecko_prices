@@ -12,7 +12,7 @@ CONFIG = {
     "RPC_URL": "https://api.mainnet-beta.solana.com",          # Public RPC (rate-limited). Replace with Helius/QuickNode/Ankr for production
     "COINGECKO_BASE": "https://api.coingecko.com/api/v3",
     "TOKENS_FILE": "tokens_list.json",
-    "USD_STARTING_POINT_FILE": "usd_starting_point.json",      # Manual overall USD starting point
+    "USD_STARTING_POINT_FILE": "usd_starting_point.csv",
     "KST_TZ": "Asia/Seoul",
     "DECIMAL_PRECISION": 50,
     "CSV_OUTPUT_DIR": Path("wallet_data"),
@@ -76,39 +76,74 @@ def load_tokens() -> list[dict]:
         sys.exit(1)
 
 
-def load_usd_starting_point() -> dict | None:
-    """Load manual overall portfolio USD starting point from usd_starting_point.json.
-    Now supports optional monero_equivalent and monero_price_usd for XMR tracking."""
+def load_usd_starting_point(total_usd: Decimal = None, monero_price: Decimal = None) -> dict | None:
+    """Load manual overall portfolio USD starting point from usd_starting_point.csv.
+    NEW: If the file doesn't exist AND current values are provided, automatically create it
+    using today's portfolio value as the baseline (first-run behavior).
+    Always uses the LAST row (most recent starting point) for consistency with per-token snapshots.
+    Full Decimal precision preserved - no float/JSON conversion."""
     file_path = Path(CONFIG["USD_STARTING_POINT_FILE"])
+    
+    # === AUTO-CREATE ON FIRST RUN ===
     if not file_path.exists():
-        return None
+        if total_usd is None or monero_price is None or monero_price <= 0:
+            print(f"Warning: {CONFIG['USD_STARTING_POINT_FILE']} not found and cannot auto-create (missing current portfolio data).")
+            return None
+        
+        kst_now = datetime.now(ZoneInfo(CONFIG["KST_TZ"]))
+        today = kst_now.strftime("%Y-%m-%d")
+        current_monero_equiv = (total_usd / monero_price)
+        
+        # Ensure parent directory exists
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["date", "usd", "monero_equivalent", "monero_price_usd"])
+            writer.writeheader()
+            writer.writerow({
+                "date": today,
+                "usd": str(total_usd),
+                "monero_equivalent": str(current_monero_equiv),
+                "monero_price_usd": str(monero_price)
+            })
+        
+        print(f"✅ First-run detected: Auto-created {CONFIG['USD_STARTING_POINT_FILE']} using current portfolio as starting point")
+        print(f"   Date               : {today}")
+        print(f"   Starting USD       : ${total_usd:,.8f}")
+        print(f"   Starting XMR Equiv : {float(current_monero_equiv):,.8f}")
+        print("   (You can manually edit or append rows later if you want new baselines)")
+    
+    # === NORMAL LOAD (file now exists or was just created) ===
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+            reader = list(csv.DictReader(f))
+            if not reader:
+                return None
+            # Use the LAST row → supports manual appending of new snapshots later
+            last_row = reader[-1]
 
-        date = data.get("date", "N/A")
-        usd_value = data.get("usd")
-        if usd_value is None:
-            print(f"Warning: 'usd' key missing in {CONFIG['USD_STARTING_POINT_FILE']}")
-            return None
+            data = {"date": last_row.get("date", "N/A")}
 
-        usd = Decimal(str(usd_value))
-        result = {"date": date, "usd": usd}
-
-        # NEW: Monero fields (optional - user updates JSON manually)
-        if "monero_equivalent" in data and data["monero_equivalent"] is not None:
+            usd_str = (last_row.get("usd") or "").strip()
+            if not usd_str:
+                print(f"Warning: 'usd' column missing or empty in {CONFIG['USD_STARTING_POINT_FILE']}")
+                return None
             try:
-                result["monero_equivalent"] = Decimal(str(data["monero_equivalent"]))
-                # No console print (kept clean as requested)
+                data["usd"] = Decimal(usd_str)
             except Exception as e:
-                print(f"Warning: Invalid 'monero_equivalent' in {CONFIG['USD_STARTING_POINT_FILE']}: {e}")
-        if "monero_price_usd" in data and data["monero_price_usd"] is not None:
-            try:
-                result["monero_price_usd"] = Decimal(str(data["monero_price_usd"]))
-            except Exception as e:
-                print(f"Warning: Invalid 'monero_price_usd' in {CONFIG['USD_STARTING_POINT_FILE']}: {e}")
+                print(f"Warning: Invalid 'usd' value in {CONFIG['USD_STARTING_POINT_FILE']}: {e}")
+                return None
 
-        return result
+            # Monero fields (optional but recommended)
+            for key in ["monero_equivalent", "monero_price_usd"]:
+                val_str = (last_row.get(key) or "").strip()
+                if val_str:
+                    try:
+                        data[key] = Decimal(val_str)
+                    except Exception as e:
+                        print(f"Warning: Invalid '{key}' value in {CONFIG['USD_STARTING_POINT_FILE']}: {e}")
+
+            return data
     except Exception as e:
         print(f"Warning: Failed to load {CONFIG['USD_STARTING_POINT_FILE']}: {e}")
         return None
@@ -585,7 +620,8 @@ def main():
 
     # ====================== Overall Portfolio Performance vs Manual Starting Point ======================
     print("\n=== 💵 Overall Portfolio Performance vs Manual Starting Point ===")
-    starting_point = load_usd_starting_point()
+    # Pass current values so the function can auto-create the CSV on first run
+    starting_point = load_usd_starting_point(total_usd=total_usd, monero_price=monero_price)
     if starting_point:
         start_date = starting_point["date"]
         start_usd = starting_point["usd"]
@@ -625,12 +661,10 @@ def main():
                 print(f"Starting XMR Price : ${float(starting_point['monero_price_usd']):,.4f}")
             print(f"Current XMR Price  : ${float(monero_price):,.4f} USD")
         else:
-            print("\n(No monero_equivalent found in starting point JSON. Add it manually for XMR delta tracking.)")
+            print("\n(No monero_equivalent found in starting point CSV. The auto-created file already includes it.)")
     else:
-        print("No usd_starting_point.json found (or it could not be read).")
-        print("Create the file with this exact format:")
-        print('{\n  "date": "2026-04-24",\n  "usd": 3500.00,\n  "monero_equivalent": 14.56789012,\n  "monero_price_usd": 240.35\n}')
-        print("Then run the script again.")
+        print("No valid data found in usd_starting_point.csv (even after auto-creation attempt).")
+        print("You can manually edit the CSV if needed. The script always uses the LAST row.")
 
     # Final summary
     included_count = sum(1 for t in portfolio if t["include_in_portfolio"])
