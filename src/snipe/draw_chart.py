@@ -13,14 +13,23 @@ parser = argparse.ArgumentParser(
     description="Generate price chart with Short & Long MAs for any coin's CSV file."
 )
 parser.add_argument(
+    'coin',
+    nargs='?',                          # ← makes it optional
+    default='fartcoin',
+    help='Coin identifier (e.g. "neet", "fartcoin"). Looks for price_data/{coin}.csv (default: fartcoin)'
+)
+parser.add_argument(
     '--csv',
     type=str,
-    default=os.path.join(SCRIPT_DIR, 'price_data', 'fartcoin.csv'),
-    help='Path to the price CSV file (default: price_data/fartcoin.csv)'
+    help='Path to the price CSV file (overrides the coin argument)'
 )
 args = parser.parse_args()
 
-CSV_PATH = args.csv
+# Determine CSV_PATH - this is the only changed logic
+if args.csv:
+    CSV_PATH = args.csv
+else:
+    CSV_PATH = os.path.join(SCRIPT_DIR, 'price_data', f'{args.coin}.csv')
 
 # === Coin ID from filename (CoinGecko API ID - exactly as stored) ===
 coin_id = os.path.splitext(os.path.basename(CSV_PATH))[0]
