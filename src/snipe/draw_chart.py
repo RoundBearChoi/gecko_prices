@@ -3,24 +3,42 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import timedelta
 import os
+import argparse
 
 # ==================== CONFIG SECTION ====================
-# Path to CSV (automatically looks for price_data/ next to this script)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CSV_PATH = os.path.join(SCRIPT_DIR, 'price_data', 'FARTCOIN.csv')
 
-SHORT_MA_WINDOW = 24      # Short-term MA (≈ 1 day)
-LONG_MA_WINDOW = 168      # Long-term MA (≈ 7 days)
+# Command-line argument for maximum flexibility
+parser = argparse.ArgumentParser(
+    description="Generate price chart with Short & Long MAs for any coin's CSV file."
+)
+parser.add_argument(
+    '--csv',
+    type=str,
+    default=os.path.join(SCRIPT_DIR, 'price_data', 'fartcoin.csv'),
+    help='Path to the price CSV file (default: price_data/fartcoin.csv)'
+)
+args = parser.parse_args()
+
+CSV_PATH = args.csv
+
+# === Derive coin name dynamically from CSV filename ===
+csv_filename = os.path.basename(CSV_PATH)
+coin_slug = os.path.splitext(csv_filename)[0].lower()          # e.g. "fartcoin"
+coin_name = coin_slug.upper()                                   # e.g. "FARTCOIN"
+
+SHORT_MA_WINDOW = 24 # Short-term MA
+LONG_MA_WINDOW = 24*7 # Long-term MA
 RECENT_DAYS_FOR_SUMMARY = 30
 
 DPI = 150                 # ← Image resolution (150 = fast & light, 300 = high quality)
-OUTPUT_FILE = 'fartcoin_price_ma_kst.png'
-TITLE = 'FARTCOIN Price (USD) with Short & Long Moving Averages (KST)'
+OUTPUT_FILE = f'{coin_slug}_price_ma_kst.png'
+TITLE = f'{coin_name} Price (USD) with Short & Long Moving Averages (KST)'
 FIG_SIZE = (15, 8)
 # =======================================================
 
 # Load data
-print(f"📂 Loading data from: {CSV_PATH}")
+print(f"📂 Loading data from: {CSV_PATH} (coin: {coin_name})")
 df = pd.read_csv(CSV_PATH)
 
 # Parse datetime and convert to KST
@@ -42,7 +60,7 @@ latest_long_ma = recent_df['long_ma'].iloc[-1]
 latest_time_kst = recent_df['datetime_kst'].iloc[-1]
 
 print(f"\n📅 Latest data point (KST): {latest_time_kst.strftime('%Y-%m-%d %H:%M')}")
-print(f"💰 Latest Price: ${latest_price:.6f}")
+print(f"💰 Latest {coin_name} Price: ${latest_price:.6f}")
 print(f"📈 Short MA ({SHORT_MA_WINDOW} periods): ${latest_short_ma:.6f}")
 print(f"📉 Long MA ({LONG_MA_WINDOW} periods): ${latest_long_ma:.6f}")
 

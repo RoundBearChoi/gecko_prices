@@ -94,7 +94,7 @@ def fetch_price_history_for_token(token: Dict, api_key: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     os.makedirs(CONFIG["OUTPUT_DIR"], exist_ok=True)
-    output_file = Path(CONFIG["OUTPUT_DIR"]) / f"{symbol}.csv"
+    output_file = Path(CONFIG["OUTPUT_DIR"]) / f"{coin_id}.csv"   # ← CHANGED: use id instead of symbol
 
     if output_file.exists() and not CONFIG["FORCE_FRESH_DOWNLOAD"]:
         print(f"✅ {output_file.name} already exists (set FORCE_FRESH_DOWNLOAD=True to override)")
