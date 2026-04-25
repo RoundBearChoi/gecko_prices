@@ -191,7 +191,7 @@ def main():
         wallet = sys.argv[1].strip()
     else:
         while True:
-            wallet = input("\n🔑 Enter your Solana wallet address (or 'exit'): ").strip()
+            wallet = input("\nEnter your Solana wallet address (or 'exit'): ").strip()
             if wallet.lower() == "exit":
                 sys.exit(0)
             if 32 <= len(wallet) <= 44 and wallet.isalnum():
@@ -292,11 +292,11 @@ def main():
             if not file_exists:
                 writer.writeheader()
             writer.writerow(row)
-        print(f"💾 Results appended to: {csv_path}")
+        print(f"Results appended to: {csv_path}")
     except Exception as e:
         print(f"❌ CSV export failed: {e}")
 
-    print("\n✅ Script completed successfully!")
+    print("\nScript completed successfully!")
 
 
 if __name__ == "__main__":
