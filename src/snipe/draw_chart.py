@@ -22,23 +22,21 @@ args = parser.parse_args()
 
 CSV_PATH = args.csv
 
-# === Derive coin name dynamically from CSV filename ===
-csv_filename = os.path.basename(CSV_PATH)
-coin_slug = os.path.splitext(csv_filename)[0].lower()          # e.g. "fartcoin"
-coin_name = coin_slug.upper()                                   # e.g. "FARTCOIN"
+# === Coin ID from filename (CoinGecko API ID - exactly as stored) ===
+coin_id = os.path.splitext(os.path.basename(CSV_PATH))[0]
 
 SHORT_MA_WINDOW = 24 # Short-term MA
 LONG_MA_WINDOW = 24*7 # Long-term MA
 RECENT_DAYS_FOR_SUMMARY = 30
 
 DPI = 150                 # ← Image resolution (150 = fast & light, 300 = high quality)
-OUTPUT_FILE = f'{coin_slug}_price_ma_kst.png'
-TITLE = f'{coin_name} Price (USD) with Short & Long Moving Averages (KST)'
+OUTPUT_FILE = f'{coin_id}_price_ma_kst.png'
+TITLE = f'{coin_id} Price (USD) with Short & Long Moving Averages (KST)'
 FIG_SIZE = (15, 8)
 # =======================================================
 
 # Load data
-print(f"📂 Loading data from: {CSV_PATH} (coin: {coin_name})")
+print(f"📂 Loading data from: {CSV_PATH} (id: {coin_id})")
 df = pd.read_csv(CSV_PATH)
 
 # Parse datetime and convert to KST
@@ -52,7 +50,7 @@ df = df.sort_values('datetime_kst').reset_index(drop=True)
 df['short_ma'] = df['price_usd'].rolling(window=SHORT_MA_WINDOW, min_periods=1).mean()
 df['long_ma'] = df['price_usd'].rolling(window=LONG_MA_WINDOW, min_periods=1).mean()
 
-# === Recent trend summary ===
+# === Recent trend summary - IMPROVED (quantitative & neutral) ===
 recent_df = df[df['datetime_kst'] >= df['datetime_kst'].max() - timedelta(days=RECENT_DAYS_FOR_SUMMARY)]
 latest_price = recent_df['price_usd'].iloc[-1]
 latest_short_ma = recent_df['short_ma'].iloc[-1]
@@ -60,18 +58,36 @@ latest_long_ma = recent_df['long_ma'].iloc[-1]
 latest_time_kst = recent_df['datetime_kst'].iloc[-1]
 
 print(f"\n📅 Latest data point (KST): {latest_time_kst.strftime('%Y-%m-%d %H:%M')}")
-print(f"💰 Latest {coin_name} Price: ${latest_price:.6f}")
-print(f"📈 Short MA ({SHORT_MA_WINDOW} periods): ${latest_short_ma:.6f}")
-print(f"📉 Long MA ({LONG_MA_WINDOW} periods): ${latest_long_ma:.6f}")
+print(f"💰 Latest {coin_id} Price: ${latest_price:.6f}")
 
-if latest_price > latest_short_ma > latest_long_ma:
-    print("🟢 **STRONG UPTREND** – price above both MAs")
-elif latest_price > latest_short_ma:
-    print("🟡 Short-term bullish (price above short MA)")
-elif latest_price < latest_short_ma < latest_long_ma:
-    print("🔴 **STRONG DOWNTREND** – price below both MAs")
-else:
-    print("⚪ Mixed / sideways recently")
+print(f"\n📈 Moving Averages:")
+print(f"  Short MA ({SHORT_MA_WINDOW}h): ${latest_short_ma:.6f}  [{(latest_price / latest_short_ma - 1)*100:+.2f}%]")
+print(f"  Long MA ({LONG_MA_WINDOW}h):  ${latest_long_ma:.6f}  [{(latest_price / latest_long_ma - 1)*100:+.2f}%]")
+
+# Helper for % change
+def pct_change(series, periods):
+    if len(series) > periods:
+        return (series.iloc[-1] / series.iloc[-periods] - 1) * 100
+    return float('nan')
+
+price_s = recent_df['price_usd']
+
+print("\n📊 Recent Performance:")
+print(f"  24h change: {pct_change(price_s, 24):+6.2f}%")
+print(f"   7d change: {pct_change(price_s, 168):+6.2f}%")
+print(f"  30d change: {pct_change(price_s, 720):+6.2f}%")
+
+# Range info
+recent_high = recent_df['price_usd'].max()
+recent_low = recent_df['price_usd'].min()
+print(f"\n📍 30d Range: ${recent_low:.4f} – ${recent_high:.4f}")
+if latest_price > 0:
+    print(f"   Current from 30d high: {(latest_price / recent_high - 1)*100 :+.1f}%")
+
+# Short MA momentum
+if len(recent_df) > 6:
+    short_mom = (latest_short_ma / recent_df['short_ma'].iloc[-6] - 1) * 100
+    print(f"\n🔄 Short MA 6h momentum: {short_mom:+.2f}%")
 
 # === Plot the chart ===
 sns.set_style("darkgrid")
