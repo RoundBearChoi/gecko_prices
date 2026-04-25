@@ -103,9 +103,9 @@ def get_token_balance(wallet_address: str, mint: str, decimals: int, token_name:
                     continue
         
         if accounts_found > 0:
-            print(f"   ℹ️  Found {accounts_found} {token_name} account(s) in {program_id[:8]}... program")
+            print(f"    Found {accounts_found} {token_name} account(s) in {program_id[:8]}... program")
         
-        print(f"   ⏳ Waiting {RPC_DELAY_BETWEEN_CALLS_SECONDS} seconds before next RPC call...")
+        print(f"    Waiting {RPC_DELAY_BETWEEN_CALLS_SECONDS} seconds before next RPC call...")
         time.sleep(RPC_DELAY_BETWEEN_CALLS_SECONDS)
 
     balance = total_raw / Decimal(10 ** decimals) if total_raw > 0 else Decimal("0")
@@ -134,7 +134,7 @@ def get_current_prices() -> Tuple[Decimal, Decimal]:
     fart_price: Decimal = fart_data.get("usd", Decimal("0"))
     usdc_price: Decimal = usdc_data.get("usd", Decimal("1"))
 
-    print(f"✅ CoinGecko prices (full precision) → FARTCOIN: ${fart_price} | USDC: ${usdc_price}")
+    print(f"\n✅ CoinGecko prices (full precision) → FARTCOIN: ${fart_price} | USDC: ${usdc_price}")
     if "last_updated_at" in fart_data:
         ts = datetime.fromtimestamp(fart_data['last_updated_at'], tz=KST_TZ)
         print(f"   Last updated: {ts.strftime('%Y-%m-%d %H:%M:%S KST')}")
@@ -181,10 +181,9 @@ def calculate_hypothetical_all_in_fart(
 # =============================================================================
 def main():
     print("=" * 80)
-    print("🚀 Solana FARTCOIN + USDC Portfolio Analyzer - ABSOLUTE MAX PRECISION v5")
-    print("   ✅ Dual Token/Token-2022 • Slippage-aware 50/50 rebalance")
-    print("   📋 No thousands separators on sell/hypothetical amounts (easy copy-paste)")
-    print(f"   🔄 Using {SLIPPAGE_ASSUMED*100:.1f}% assumed slippage")
+    print("🚀 Solana FARTCOIN + USDC Portfolio Analyzer")
+    print("    Dual Token/Token-2022 • Slippage-aware 50/50 rebalance")
+    print(f"    Using {SLIPPAGE_ASSUMED*100:.1f}% assumed slippage")
     print("=" * 80)
 
     # Wallet input
@@ -199,17 +198,12 @@ def main():
                 break
             print("❌ Invalid address (32-44 base58 chars).")
 
-    print(f"\n📍 Analyzing wallet: {wallet}")
-
-    print("🔍 Fetching liquid token balances (Token + Token-2022)...")
+    print("\nFetching liquid token balances (Token + Token-2022)...")
     fart_balance = get_token_balance(wallet, FARTCOIN_MINT, FARTCOIN_BALANCE_DECIMALS, "FARTCOIN")
     usdc_balance = get_token_balance(wallet, USDC_MINT, USDC_BALANCE_DECIMALS, "USDC")
 
     print(f"   FARTCOIN liquid balance: {fart_balance}")
     print(f"   USDC liquid balance:     {usdc_balance}")
-
-    print("\n⚠️  IMPORTANT: This shows ONLY liquid balances in your wallet's token accounts.")
-    print("   Tokens locked in Orca (or any DEX) LP positions are NOT included here.")
 
     fart_price, usdc_price = get_current_prices()
 
@@ -231,7 +225,7 @@ def main():
     # Summary
     now_kst = datetime.now(KST_TZ)
     print("\n" + "=" * 80)
-    print("📊 PORTFOLIO SUMMARY (liquid balances only)")
+    print("📊 PORTFOLIO SUMMARY")
     print("=" * 80)
     print(f"Wallet                  : {wallet}")
     print(f"Timestamp (KST)         : {now_kst.strftime('%Y-%m-%d %H:%M:%S KST')}")
