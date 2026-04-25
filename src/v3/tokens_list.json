@@ -1,5 +1,12 @@
 [
   {
+    "symbol": "SOL",
+    "id": "solana",
+    "mint": "NATIVE",
+    "include_in_portfolio": true,
+    "comment": ""
+  },
+  {
     "symbol": "FARTCOIN",
     "id": "fartcoin",
     "mint": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump",
@@ -31,76 +38,6 @@
     "symbol": "TROLL",
     "id": "troll-2",
     "mint": "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2",
-    "include_in_portfolio": true,
-    "comment": ""
-  },
-  {
-    "symbol": "ETH",
-    "id": "ethereum-wormhole",
-    "mint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
-    "include_in_portfolio": true,
-    "comment": ""
-  },
-  {
-    "symbol": "SOL",
-    "id": "solana",
-    "mint": "NATIVE",
-    "include_in_portfolio": true,
-    "comment": ""
-  },
-  {
-    "symbol": "CBBTC",
-    "id": "coinbase-wrapped-btc",
-    "mint": "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij",
-    "include_in_portfolio": true,
-    "comment": ""
-  },
-  {
-    "symbol": "PUMP",
-    "id": "pump-fun",
-    "mint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
-    "include_in_portfolio": true,
-    "comment": ""
-  },
-  {
-    "symbol": "RAY",
-    "id": "raydium",
-    "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
-    "include_in_portfolio": true,
-    "comment": ""
-  },
-  {
-    "symbol": "HYPE",
-    "id": "wormhole-bridged-hype",
-    "mint": "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
-    "include_in_portfolio": true,
-    "comment": ""
-  },
-  {
-    "symbol": "ZEC",
-    "id": "omnibridge-bridged-zcash-solana",
-    "mint": "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS",
-    "include_in_portfolio": true,
-    "comment": ""
-  },
-  {
-    "symbol": "MET",
-    "id": "meteora",
-    "mint": "METvsvVRapdj9cFLzq4Tr43xK4tAjQfwX76z3n6mWQL",
-    "include_in_portfolio": true,
-    "comment": ""
-  },
-  {
-    "symbol": "KMNO",
-    "id": "kamino",
-    "mint": "KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS",
-    "include_in_portfolio": true,
-    "comment": ""
-  },
-  {
-    "symbol": "JUP",
-    "id": "jupiter-exchange-solana",
-    "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
     "include_in_portfolio": true,
     "comment": ""
   }

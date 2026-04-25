@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from matplotlib.ticker import FuncFormatter
@@ -14,6 +15,19 @@ DPI = 150                  # Chart resolution (higher = sharper saved image)
 DATA_DIR = "volume_data"   # Folder containing the *_daily_volume.csv files
 SAVE_CHART = True          # Set False if you only want console output
 # =======================================================
+
+# ====================== COMMAND LINE SUPPORT ======================
+# Usage examples:
+#   python draw_volume_chart.py                  → uses default from config (fartcoin)
+#   python draw_volume_chart.py neet             → uses "neet"
+#   python draw_volume_chart.py popcat           → uses "popcat"
+#   python draw_volume_chart.py troll-2          → uses "troll-2"
+if len(sys.argv) > 1:
+    TOKEN_ID = sys.argv[1].strip().lower()   # normalize to lowercase for filename safety
+    print(f"📌 COMMAND LINE OVERRIDE: Using TOKEN_ID = '{TOKEN_ID}'")
+else:
+    print(f"📌 Using default TOKEN_ID from config section: '{TOKEN_ID}'")
+# =================================================================
 
 # Build full path (works whether volume_data is in current dir or script dir)
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -80,7 +94,7 @@ else:
             color='#e74c3c', linewidth=3.5, label='7-day Rolling Average')
 
     # Title & labels (explicitly KST)
-    ax.set_title(f'{TOKEN_ID.replace("-", " ").title()} Daily Trading Volume (USD)\nLast {MONTHS} Months – KST', 
+    ax.set_title(f'{TOKEN_ID} Daily Trading Volume (USD)\nLast {MONTHS} Months – KST', 
                  fontsize=18, pad=20)
     ax.set_xlabel('Date (KST)', fontsize=13)
     ax.set_ylabel('Volume (USD)', fontsize=13)

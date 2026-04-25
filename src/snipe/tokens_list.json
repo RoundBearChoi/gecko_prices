@@ -40,5 +40,19 @@
     "mint": "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2",
     "include_in_portfolio": true,
     "comment": ""
+  },
+  {
+    "symbol": "AURA",
+    "id": "aura-on-sol",
+    "mint": "DtR4D9FtVoTX2569gaL837ZgrB6wNjj6tkmnX9Rdk9B2",
+    "include_in_portfolio": false,
+    "comment": "low volume"
+  },
+  {
+    "symbol": "WOULD",
+    "id": "would",
+    "mint": "J1Wpmugrooj1yMyQKrdZ2vwRXG5rhfx3vTnYE39gpump",
+    "include_in_portfolio": false,
+    "comment": "low volume"
   }
 ]
