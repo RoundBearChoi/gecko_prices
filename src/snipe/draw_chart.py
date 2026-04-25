@@ -25,9 +25,12 @@ CSV_PATH = args.csv
 # === Coin ID from filename (CoinGecko API ID - exactly as stored) ===
 coin_id = os.path.splitext(os.path.basename(CSV_PATH))[0]
 
-SHORT_MA_WINDOW = 24 # Short-term MA
-LONG_MA_WINDOW = 24*7 # Long-term MA
+SHORT_MA_WINDOW = 24      # Short-term MA (hours)
+LONG_MA_WINDOW = 24*7     # Long-term MA (hours)
 RECENT_DAYS_FOR_SUMMARY = 30
+
+# NEW: Configurable short MA momentum windows (easily extensible)
+SHORT_MA_MOMENTUM_WINDOWS = [6, 12, 24]   # ← Add or remove hours here as needed
 
 DPI = 150                 # ← Image resolution (150 = fast & light, 300 = high quality)
 OUTPUT_FILE = f'{coin_id}_price_ma_kst.png'
@@ -74,6 +77,7 @@ price_s = recent_df['price_usd']
 
 print("\n📊 Recent Performance:")
 print(f"  24h change: {pct_change(price_s, 24):+6.2f}%")
+print(f"   3d change: {pct_change(price_s, 72):+6.2f}%")
 print(f"   7d change: {pct_change(price_s, 168):+6.2f}%")
 print(f"  30d change: {pct_change(price_s, 720):+6.2f}%")
 
@@ -84,10 +88,14 @@ print(f"\n📍 30d Range: ${recent_low:.4f} – ${recent_high:.4f}")
 if latest_price > 0:
     print(f"   Current from 30d high: {(latest_price / recent_high - 1)*100 :+.1f}%")
 
-# Short MA momentum
-if len(recent_df) > 6:
-    short_mom = (latest_short_ma / recent_df['short_ma'].iloc[-6] - 1) * 100
-    print(f"\n🔄 Short MA 6h momentum: {short_mom:+.2f}%")
+# === Short MA momentum (multiple short-term windows) ===
+print("\n🔄 Short MA Momentum:")
+for hours in SHORT_MA_MOMENTUM_WINDOWS:
+    if len(recent_df) > hours:
+        mom = (latest_short_ma / recent_df['short_ma'].iloc[-hours] - 1) * 100
+        print(f"  {hours:2d}h : {mom:+.2f}%")
+    else:
+        print(f"  {hours:2d}h : N/A (insufficient data)")
 
 # === Plot the chart ===
 sns.set_style("darkgrid")
