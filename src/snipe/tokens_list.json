@@ -3,7 +3,7 @@
     "symbol": "SOL",
     "id": "solana",
     "mint": "NATIVE",
-    "include_in_portfolio": true,
+    "include_in_portfolio": false,
     "comment": ""
   },
   {
