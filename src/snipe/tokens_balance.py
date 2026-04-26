@@ -45,6 +45,16 @@ TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 RPC_RETRY_DELAY_SECONDS: int = 20
 RPC_DELAY_BETWEEN_CALLS_SECONDS: float = 2
 
+# Shared fieldnames for BOTH portfolio CSV and starting_point CSV
+CSV_FIELDNAMES: list[str] = [
+    "timestamp_kst", "wallet_address", "token_id",
+    "token_balance", "usdc_balance",
+    "token_price_usd", "usdc_price_usd", "token_value_usd",
+    "usdc_value_usd", "total_value_usd", "token_pct", "usdc_pct",
+    "sell_token_to_50_50", "sell_usdc_to_50_50",
+    "hypothetical_token_equivalent", "assumed_slippage"
+]
+
 # =============================================================================
 # CONSOLE ROUNDING HELPERS (display only)
 # =============================================================================
@@ -353,8 +363,63 @@ def main():
         main_balance, usdc_balance, usdc_price, main_price
     )
 
-    # Summary (pure raw ids only)
+    # =============================================================================
+    # STARTING POINT BASELINE + DELTA CALCULATION (NEW FEATURE)
+    # =============================================================================
+    # now_kst and row are built here so they are available for starting_point CSV
     now_kst = datetime.now(KST_TZ)
+
+    # Build row data once (reused for portfolio CSV append + starting_point creation)
+    row = {
+        "timestamp_kst": now_kst.strftime("%Y-%m-%d %H:%M:%S"),
+        "wallet_address": wallet,
+        "token_id": main_token_id,
+        "token_balance": str(main_balance),
+        "usdc_balance": str(usdc_balance),
+        "token_price_usd": str(main_price),
+        "usdc_price_usd": str(usdc_price),
+        "token_value_usd": str(token_value),
+        "usdc_value_usd": str(usdc_value),
+        "total_value_usd": str(total_value),
+        "token_pct": str(token_pct),
+        "usdc_pct": str(usdc_pct),
+        "sell_token_to_50_50": str(sell_token),
+        "sell_usdc_to_50_50": str(sell_usdc),
+        "hypothetical_token_equivalent": str(hypothetical_token),
+        "assumed_slippage": str(SLIPPAGE_ASSUMED)
+    }
+
+    # Starting point CSV - one-time baseline snapshot
+    starting_point_filename = f"starting_point_{main_token_id}.csv"
+    starting_point_path = os.path.join(CSV_OUTPUT_DIR, starting_point_filename)
+    starting_equiv = hypothetical_token
+
+    if os.path.exists(starting_point_path):
+        try:
+            with open(starting_point_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+                if rows and "hypothetical_token_equivalent" in rows[0]:
+                    starting_equiv = Decimal(rows[0]["hypothetical_token_equivalent"])
+                    print(f"✅ Loaded starting {main_token_id} equivalent baseline: {console_round_balance(starting_equiv)}")
+        except Exception as e:
+            print(f"⚠️  Could not read starting_point_{main_token_id}.csv: {e}")
+    else:
+        print(f"📝 No starting_point_{main_token_id}.csv found - creating new baseline with current data...")
+        try:
+            with open(starting_point_path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
+                writer.writeheader()
+                writer.writerow(row)
+            print(f"✅ Created starting_point_{main_token_id}.csv baseline snapshot")
+        except Exception as e:
+            print(f"❌ Failed to create starting_point CSV: {e}")
+
+    # Delta calculation
+    equiv_delta = hypothetical_token - starting_equiv
+    usd_delta = equiv_delta * main_price if main_price > 0 else Decimal("0")
+
+    # Summary (pure raw ids only)
     print("\n" + "=" * 80)
     print(f"📊 {main_token_id} + {USDC_GECKO_ID} portfolio summary")
     print("=" * 80)
@@ -365,6 +430,7 @@ def main():
     print(f"{main_token_id}                  : {console_round_balance(main_balance)} (${console_round_usd(token_value):,.{CONSOLE_USD_ROUNDING}f})")
     print(f"{USDC_GECKO_ID}                  : {console_round_balance(usdc_balance)} (${console_round_usd(usdc_value):,.{CONSOLE_USD_ROUNDING}f})")
     print(f"{main_token_id} equivalent       : {console_round_balance(hypothetical_token)} {main_token_id}")
+    print(f"{main_token_id} equiv delta      : {console_round_balance(equiv_delta)} {main_token_id} (${console_round_usd(usd_delta):+,.{CONSOLE_USD_ROUNDING}f})")
     print(f"Total liquid value        : ${console_round_usd(total_value):,.{CONSOLE_USD_ROUNDING}f} USD")
     print(f"{main_token_id} %                : {console_round_usd(token_pct):.4f}%")
     print(f"{USDC_GECKO_ID} %                : {console_round_usd(usdc_pct):.4f}%")
@@ -388,43 +454,15 @@ def main():
     if main_price == 0:
         print("⚠️  Note: Token price returned zero - calculations may be inaccurate.")
 
-    # CSV export
+    # CSV export (portfolio history - always appends)
     csv_filename = f"solana_portfolio_{main_token_id}_usdc.csv"
     csv_path = os.path.join(CSV_OUTPUT_DIR, csv_filename)
     
-    fieldnames = [
-        "timestamp_kst", "wallet_address", "token_id",
-        "token_balance", "usdc_balance",
-        "token_price_usd", "usdc_price_usd", "token_value_usd",
-        "usdc_value_usd", "total_value_usd", "token_pct", "usdc_pct",
-        "sell_token_to_50_50", "sell_usdc_to_50_50",
-        "hypothetical_token_equivalent", "assumed_slippage"
-    ]
-
-    row = {
-        "timestamp_kst": now_kst.strftime("%Y-%m-%d %H:%M:%S"),
-        "wallet_address": wallet,
-        "token_id": main_token_id,
-        "token_balance": str(main_balance),
-        "usdc_balance": str(usdc_balance),
-        "token_price_usd": str(main_price),
-        "usdc_price_usd": str(usdc_price),
-        "token_value_usd": str(token_value),
-        "usdc_value_usd": str(usdc_value),
-        "total_value_usd": str(total_value),
-        "token_pct": str(token_pct),
-        "usdc_pct": str(usdc_pct),
-        "sell_token_to_50_50": str(sell_token),
-        "sell_usdc_to_50_50": str(sell_usdc),
-        "hypothetical_token_equivalent": str(hypothetical_token),
-        "assumed_slippage": str(SLIPPAGE_ASSUMED)
-    }
-
     file_exists = os.path.exists(csv_path)
     try:
         mode = "a" if file_exists else "w"
         with open(csv_path, mode=mode, newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
             if not file_exists:
                 writer.writeheader()
             writer.writerow(row)
