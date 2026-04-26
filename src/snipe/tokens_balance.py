@@ -7,29 +7,29 @@ import os
 import json
 import time
 from functools import wraps
-from typing import Tuple
+from typing import Tuple, Dict
 from zoneinfo import ZoneInfo
 
 # =============================================================================
 # CONFIG SECTION
 # =============================================================================
-FARTCOIN_MINT: str = "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"
 USDC_MINT: str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-
-FARTCOIN_GECKO_ID: str = "fartcoin"
 USDC_GECKO_ID: str = "usd-coin"
+
+# Smart relative path - automatically finds tokens_list.json next to this script
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+TOKENS_LIST_PATH: str = os.path.join(SCRIPT_DIR, "tokens_list.json")
 
 RPC_URL: str = "https://api.mainnet-beta.solana.com"
 COINGECKO_BASE: str = "https://api.coingecko.com/api/v3"
 
 CSV_OUTPUT_DIR: str = "."
-CSV_FILENAME: str = "solana_portfolio_fart_usdc.csv"
 
 # Assumed slippage for 50/50 rebalance calculations
 SLIPPAGE_ASSUMED: Decimal = Decimal("0.01")  # 1% — change as needed
 
 # Console display rounding (math + CSV always use full Decimal precision)
-CONSOLE_BALANCE_ROUNDING: int = 6   # Token quantities (FARTCOIN, USDC, sell amounts, hypothetical)
+CONSOLE_BALANCE_ROUNDING: int = 6   # Token quantities 
 CONSOLE_USD_ROUNDING: int = 3       # USD values, prices, total value
 
 # Absolute maximum precision for all internal math
@@ -134,10 +134,23 @@ def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
     return token_data
 
 
-def get_specific_balance(token_accounts: dict, mint: str, token_name: str) -> Decimal:
-    """Extract balance for a specific mint. Decimals come from on-chain data."""
+def get_raw_token_balance(token_accounts: dict, mint: str) -> Decimal:
+    """Pure function: Get balance for a mint without any printing or side effects."""
     if mint not in token_accounts:
-        print(f"    No {token_name} accounts found.")
+        return Decimal("0")
+    
+    info = token_accounts[mint]
+    raw = Decimal(info.get("raw_amount", "0"))
+    decimals = int(info.get("decimals", 6))
+    
+    balance = raw / Decimal(10 ** decimals)
+    return balance
+
+
+def get_specific_balance(token_accounts: dict, mint: str, token_id: str) -> Decimal:
+    """Extract balance for a specific mint with console output (raw id only)."""
+    if mint not in token_accounts:
+        print(f"    No {token_id} accounts found.")
         return Decimal("0")
     
     info = token_accounts[mint]
@@ -145,21 +158,23 @@ def get_specific_balance(token_accounts: dict, mint: str, token_name: str) -> De
     decimals = info.get("decimals", 6)
     
     balance = raw / Decimal(10 ** decimals)
-    print(f"    Found {token_name} balance: {console_round_balance(balance)} (decimals={decimals} from on-chain data)")
+    print(f"    Found {token_id} balance: {console_round_balance(balance)} (decimals={decimals} from on-chain data)")
     return balance
 
 
 # =============================================================================
-# HELPER FUNCTIONS
+# PRICE FETCHING
 # =============================================================================
-
 @retry()
-def get_current_prices() -> Tuple[Decimal, Decimal]:
-    """CoinGecko with precision=full + direct Decimal parsing."""
-    ids = f"{FARTCOIN_GECKO_ID},{USDC_GECKO_ID}"
+def get_prices(gecko_ids: list[str]) -> Dict[str, Decimal]:
+    """Fetch prices for multiple CoinGecko IDs."""
+    if not gecko_ids:
+        return {}
+    
+    ids_str = ",".join([id_ for id_ in gecko_ids])
     url = f"{COINGECKO_BASE}/simple/price"
     params = {
-        "ids": ids,
+        "ids": ids_str,
         "vs_currencies": "usd",
         "precision": "full",
         "include_last_updated_at": "true"
@@ -169,52 +184,74 @@ def get_current_prices() -> Tuple[Decimal, Decimal]:
     response.raise_for_status()
     data = json.loads(response.text, parse_float=Decimal)
 
-    fart_data = data.get(FARTCOIN_GECKO_ID, {})
-    usdc_data = data.get(USDC_GECKO_ID, {})
+    prices: Dict[str, Decimal] = {}
+    for gid in gecko_ids:
+        prices[gid] = data.get(gid, {}).get("usd", Decimal("0"))
 
-    fart_price: Decimal = fart_data.get("usd", Decimal("0"))
-    usdc_price: Decimal = usdc_data.get("usd", Decimal("1"))
-
-    print(f"\n✅ CoinGecko prices (full precision) → FARTCOIN: ${console_round_usd(fart_price)} | USDC: ${console_round_usd(usdc_price)}")
-    if "last_updated_at" in fart_data:
-        ts = datetime.fromtimestamp(fart_data['last_updated_at'], tz=KST_TZ)
+    print("\n✅ CoinGecko prices (full precision):")
+    for gid, price in prices.items():
+        print(f"   {gid}: ${console_round_usd(price)}")
+    
+    if gecko_ids and data.get(gecko_ids[0], {}).get("last_updated_at"):
+        ts = datetime.fromtimestamp(data[gecko_ids[0]]['last_updated_at'], tz=KST_TZ)
         print(f"   Last updated: {ts.strftime('%Y-%m-%d %H:%M:%S KST')}")
-    return fart_price, usdc_price
+    
+    return prices
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+def load_tokens_config() -> list[dict]:
+    """Load the dynamic tokens list from JSON (now using relative path)."""
+    print(f"🔍 Looking for tokens_list.json at: {TOKENS_LIST_PATH}")
+    
+    if not os.path.exists(TOKENS_LIST_PATH):
+        print(f"⚠️  Tokens list not found at {TOKENS_LIST_PATH}")
+        print("   → Please create tokens_list.json in the same folder as tokens_balance.py")
+        print("   → Copy the JSON content I provided earlier.")
+        sys.exit(1)
+    
+    with open(TOKENS_LIST_PATH, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        print(f"✅ Loaded {len(data)} tokens from tokens_list.json")
+        return data
 
 
 def calculate_rebalance(
-    fart_balance: Decimal, usdc_balance: Decimal,
-    fart_price: Decimal, usdc_price: Decimal,
+    token_balance: Decimal, usdc_balance: Decimal,
+    token_price: Decimal, usdc_price: Decimal,
     slippage: Decimal
 ) -> Tuple[Decimal, Decimal, Decimal, Decimal]:
-    """Calculates sell amounts to reach 50/50 AFTER slippage."""
-    fart_value = fart_balance * fart_price
+    """Calculates sell amounts to reach 50/50 AFTER slippage. Generic for any token+USDC."""
+    token_value = token_balance * token_price
     usdc_value = usdc_balance * usdc_price
-    total_value = fart_value + usdc_value
+    total_value = token_value + usdc_value
     if total_value == 0:
         return Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")
     
-    if fart_value > usdc_value:
-        diff = fart_value - usdc_value
+    if token_value > usdc_value:
+        diff = token_value - usdc_value
         sell_value = diff / (Decimal("2") - slippage)
-        sell_fart = sell_value / fart_price if fart_price > 0 else Decimal("0")
+        sell_token = sell_value / token_price if token_price > 0 else Decimal("0")
         sell_usdc = Decimal("0")
-    elif usdc_value > fart_value:
-        diff = usdc_value - fart_value
+    elif usdc_value > token_value:
+        diff = usdc_value - token_value
         sell_value = diff / (Decimal("2") - slippage)
-        sell_fart = Decimal("0")
+        sell_token = Decimal("0")
         sell_usdc = sell_value / usdc_price if usdc_price > 0 else Decimal("0")
     else:
-        sell_fart = sell_usdc = Decimal("0")
-    return sell_fart, sell_usdc, fart_value, usdc_value
+        sell_token = sell_usdc = Decimal("0")
+    return sell_token, sell_usdc, token_value, usdc_value
 
 
-def calculate_hypothetical_all_in_fart(
-    fart_balance: Decimal, usdc_balance: Decimal, usdc_price: Decimal, fart_price: Decimal
+def calculate_hypothetical_all_in_token(
+    token_balance: Decimal, usdc_balance: Decimal, usdc_price: Decimal, token_price: Decimal
 ) -> Decimal:
+    """Calculate equivalent if all USDC converted to the main token."""
     usdc_value = usdc_balance * usdc_price
-    additional_fart = usdc_value / fart_price if fart_price > 0 else Decimal("0")
-    return fart_balance + additional_fart
+    additional_token = usdc_value / token_price if token_price > 0 else Decimal("0")
+    return token_balance + additional_token
 
 
 # =============================================================================
@@ -222,11 +259,14 @@ def calculate_hypothetical_all_in_fart(
 # =============================================================================
 def main():
     print("=" * 80)
-    print("🚀 Solana FARTCOIN + USDC Portfolio Analyzer")
-    print("    Dual Token/Token-2022 • Slippage-aware 50/50 rebalance")
+    print("🚀 Dynamic Solana Token + USDC Portfolio Analyzer")
+    print(f"    Dual Token/Token-2022 • Slippage-aware 50/50 rebalance")
     print(f"    Using {SLIPPAGE_ASSUMED*100:.1f}% assumed slippage")
     print(f"    Console rounding → Balances: {CONSOLE_BALANCE_ROUNDING} decimals | USD: {CONSOLE_USD_ROUNDING} decimals")
     print("=" * 80)
+
+    # Load tokens config
+    tokens_config = load_tokens_config()
 
     # Wallet input
     if len(sys.argv) > 1:
@@ -244,88 +284,139 @@ def main():
     
     token_accounts = get_all_token_accounts(wallet)
     
-    fart_balance = get_specific_balance(token_accounts, FARTCOIN_MINT, "FARTCOIN")
-    usdc_balance = get_specific_balance(token_accounts, USDC_MINT, "USDC")
+    # Prepare candidate IDs for price fetch
+    portfolio_candidates = [t for t in tokens_config if t.get("include_in_portfolio", False)]
+    candidate_ids = [t["id"] for t in portfolio_candidates if t.get("mint") != "NATIVE"]
+    all_ids = list(set(candidate_ids + [USDC_GECKO_ID]))
+    
+    prices_dict = get_prices(all_ids)
+    usdc_price = prices_dict.get(USDC_GECKO_ID, Decimal(1))
 
-    print(f"   FARTCOIN liquid balance: {console_round_balance(fart_balance)}")
-    print(f"   USDC liquid balance:     {console_round_balance(usdc_balance)}")
+    # Select main token: first include_in_portfolio with value > $20, else fallback to FARTCOIN
+    main_token_config = None
+    for token in tokens_config:
+        if not token.get("include_in_portfolio", False):
+            continue
+        mint = token.get("mint")
+        if mint == "NATIVE":
+            continue
+        token_id = token["id"]
+        balance = get_raw_token_balance(token_accounts, mint)
+        price = prices_dict.get(token_id, Decimal(0))
+        value_usd = balance * price
+        
+        print(f"   📋 Checked {token_id}: {console_round_balance(balance)} @ ${console_round_usd(price)} = ${console_round_usd(value_usd)}")
+        
+        if value_usd > Decimal("20"):
+            main_token_config = token
+            print(f"✅ Selected {token_id} as main token (>$20 USD value)")
+            break
 
-    fart_price, usdc_price = get_current_prices()
+    if main_token_config is None:
+        # Fallback to FARTCOIN
+        for token in tokens_config:
+            if token["id"] == "fartcoin":
+                main_token_config = token
+                print("⚠️  No token exceeded $20 USD. Falling back to fartcoin-usdc")
+                break
+        else:
+            print("❌ Fallback token not found. Exiting.")
+            sys.exit(1)
 
-    sell_fart, sell_usdc, fart_value, usdc_value = calculate_rebalance(
-        fart_balance, usdc_balance, fart_price, usdc_price, SLIPPAGE_ASSUMED
+    # Finalize main token details (raw id only)
+    main_token_id: str = main_token_config["id"]
+    main_token_mint: str = main_token_config["mint"]
+
+    # Get final balances with display (raw id only)
+    print("\n" + "-" * 40)
+    main_balance = get_specific_balance(token_accounts, main_token_mint, main_token_id)
+    usdc_balance = get_specific_balance(token_accounts, USDC_MINT, USDC_GECKO_ID)
+
+    main_price = prices_dict.get(main_token_id, Decimal(0))
+
+    print(f"   {main_token_id} liquid balance: {console_round_balance(main_balance)}")
+    print(f"   {USDC_GECKO_ID} liquid balance: {console_round_balance(usdc_balance)}")
+
+    # Calculations (full Decimal precision)
+    sell_token, sell_usdc, token_value, usdc_value = calculate_rebalance(
+        main_balance, usdc_balance, main_price, usdc_price, SLIPPAGE_ASSUMED
     )
-    total_value = fart_value + usdc_value
+    total_value = token_value + usdc_value
 
     if total_value > 0:
-        fart_pct = (fart_value / total_value) * Decimal("100")
+        token_pct = (token_value / total_value) * Decimal("100")
         usdc_pct = (usdc_value / total_value) * Decimal("100")
     else:
-        fart_pct = usdc_pct = Decimal("0")
+        token_pct = usdc_pct = Decimal("0")
 
-    hypothetical_fart = calculate_hypothetical_all_in_fart(
-        fart_balance, usdc_balance, usdc_price, fart_price
+    hypothetical_token = calculate_hypothetical_all_in_token(
+        main_balance, usdc_balance, usdc_price, main_price
     )
 
-    # Summary (console-rounded)
+    # Summary (pure raw ids only)
     now_kst = datetime.now(KST_TZ)
     print("\n" + "=" * 80)
-    print("📊 PORTFOLIO SUMMARY")
+    print(f"📊 {main_token_id} + {USDC_GECKO_ID} portfolio summary")
     print("=" * 80)
     print(f"Wallet                  : {wallet}")
     print(f"Timestamp (KST)         : {now_kst.strftime('%Y-%m-%d %H:%M:%S KST')}")
+    print(f"Main token              : {main_token_id}")
     print(f"Assumed slippage        : {SLIPPAGE_ASSUMED*100:.2f}%")
-    print(f"FARTCOIN (liquid)       : {console_round_balance(fart_balance)} (${console_round_usd(fart_value):,.{CONSOLE_USD_ROUNDING}f})")
-    print(f"USDC (liquid)           : {console_round_balance(usdc_balance)} (${console_round_usd(usdc_value):,.{CONSOLE_USD_ROUNDING}f})")
+    print(f"{main_token_id}                : {console_round_balance(main_balance)} (${console_round_usd(token_value):,.{CONSOLE_USD_ROUNDING}f})")
+    print(f"{USDC_GECKO_ID}                : {console_round_balance(usdc_balance)} (${console_round_usd(usdc_value):,.{CONSOLE_USD_ROUNDING}f})")
     print(f"Total liquid value      : ${console_round_usd(total_value):,.{CONSOLE_USD_ROUNDING}f} USD")
-    print(f"FARTCOIN %              : {console_round_usd(fart_pct):.4f}%")   # percentages stay at 4 decimals for readability
-    print(f"USDC %                  : {console_round_usd(usdc_pct):.4f}%")
+    print(f"{main_token_id} %              : {console_round_usd(token_pct):.4f}%")
+    print(f"{USDC_GECKO_ID} %              : {console_round_usd(usdc_pct):.4f}%")
     print("-" * 80)
 
-    # REBALANCE OUTPUT
+    # REBALANCE OUTPUT (raw ids only)
     slippage_pct_str = f"{SLIPPAGE_ASSUMED*100:.1f}%"
-    if sell_fart > 0:
-        sell_value = sell_fart * fart_price
+    if sell_token > 0:
+        sell_value = sell_token * main_price
         sell_pct = (sell_value / total_value * Decimal("100")) if total_value > 0 else Decimal("0")
-        print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_fart)} FARTCOIN ({console_round_usd(sell_pct):.4f}% of portfolio)")
+        print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_token)} {main_token_id} ({console_round_usd(sell_pct):.4f}% of portfolio)")
     elif sell_usdc > 0:
         sell_value = sell_usdc * usdc_price
         sell_pct = (sell_value / total_value * Decimal("100")) if total_value > 0 else Decimal("0")
-        print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_usdc)} USDC ({console_round_usd(sell_pct):.4f}% of portfolio)")
+        print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_usdc)} {USDC_GECKO_ID} ({console_round_usd(sell_pct):.4f}% of portfolio)")
     else:
         print("✅ Portfolio is already perfectly balanced at 50/50!")
 
-    print(f"🚀 Hypothetical all-in FARTCOIN: {console_round_balance(hypothetical_fart)} FARTCOIN")
+    print(f"🚀 Hypothetical all-in {main_token_id}: {console_round_balance(hypothetical_token)} {main_token_id}")
     print("=" * 80)
 
-    if fart_price == 0:
-        print("⚠️  Note: FARTCOIN price returned zero - calculations may be inaccurate.")
+    if main_price == 0:
+        print("⚠️  Note: Token price returned zero - calculations may be inaccurate.")
 
-    # CSV export — FULL precision (unchanged)
-    csv_path = os.path.join(CSV_OUTPUT_DIR, CSV_FILENAME)
+    # CSV export
+    csv_filename = f"solana_portfolio_{main_token_id}_usdc.csv"
+    csv_path = os.path.join(CSV_OUTPUT_DIR, csv_filename)
+    
     fieldnames = [
-        "timestamp_kst", "wallet_address", "fartcoin_balance", "usdc_balance",
-        "fartcoin_price_usd", "usdc_price_usd", "fartcoin_value_usd",
-        "usdc_value_usd", "total_value_usd", "fartcoin_pct", "usdc_pct",
-        "sell_fartcoin_to_50_50", "sell_usdc_to_50_50",
-        "hypothetical_fartcoin_equivalent", "assumed_slippage"
+        "timestamp_kst", "wallet_address", "token_id",
+        "token_balance", "usdc_balance",
+        "token_price_usd", "usdc_price_usd", "token_value_usd",
+        "usdc_value_usd", "total_value_usd", "token_pct", "usdc_pct",
+        "sell_token_to_50_50", "sell_usdc_to_50_50",
+        "hypothetical_token_equivalent", "assumed_slippage"
     ]
 
     row = {
         "timestamp_kst": now_kst.strftime("%Y-%m-%d %H:%M:%S"),
         "wallet_address": wallet,
-        "fartcoin_balance": str(fart_balance),
+        "token_id": main_token_id,
+        "token_balance": str(main_balance),
         "usdc_balance": str(usdc_balance),
-        "fartcoin_price_usd": str(fart_price),
+        "token_price_usd": str(main_price),
         "usdc_price_usd": str(usdc_price),
-        "fartcoin_value_usd": str(fart_value),
+        "token_value_usd": str(token_value),
         "usdc_value_usd": str(usdc_value),
         "total_value_usd": str(total_value),
-        "fartcoin_pct": str(fart_pct),
+        "token_pct": str(token_pct),
         "usdc_pct": str(usdc_pct),
-        "sell_fartcoin_to_50_50": str(sell_fart),
+        "sell_token_to_50_50": str(sell_token),
         "sell_usdc_to_50_50": str(sell_usdc),
-        "hypothetical_fartcoin_equivalent": str(hypothetical_fart),
+        "hypothetical_token_equivalent": str(hypothetical_token),
         "assumed_slippage": str(SLIPPAGE_ASSUMED)
     }
 
