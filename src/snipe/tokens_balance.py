@@ -358,15 +358,16 @@ def main():
     print("\n" + "=" * 80)
     print(f"📊 {main_token_id} + {USDC_GECKO_ID} portfolio summary")
     print("=" * 80)
-    print(f"Wallet                  : {wallet}")
-    print(f"Timestamp (KST)         : {now_kst.strftime('%Y-%m-%d %H:%M:%S KST')}")
-    print(f"Main token              : {main_token_id}")
-    print(f"Assumed slippage        : {SLIPPAGE_ASSUMED*100:.2f}%")
-    print(f"{main_token_id}                : {console_round_balance(main_balance)} (${console_round_usd(token_value):,.{CONSOLE_USD_ROUNDING}f})")
-    print(f"{USDC_GECKO_ID}                : {console_round_balance(usdc_balance)} (${console_round_usd(usdc_value):,.{CONSOLE_USD_ROUNDING}f})")
-    print(f"Total liquid value      : ${console_round_usd(total_value):,.{CONSOLE_USD_ROUNDING}f} USD")
-    print(f"{main_token_id} %              : {console_round_usd(token_pct):.4f}%")
-    print(f"{USDC_GECKO_ID} %              : {console_round_usd(usdc_pct):.4f}%")
+    print(f"Wallet                    : {wallet}")
+    print(f"Timestamp (KST)           : {now_kst.strftime('%Y-%m-%d %H:%M:%S KST')}")
+    print(f"Main token                : {main_token_id}")
+    print(f"Assumed slippage          : {SLIPPAGE_ASSUMED*100:.2f}%")
+    print(f"{main_token_id}                  : {console_round_balance(main_balance)} (${console_round_usd(token_value):,.{CONSOLE_USD_ROUNDING}f})")
+    print(f"{USDC_GECKO_ID}                  : {console_round_balance(usdc_balance)} (${console_round_usd(usdc_value):,.{CONSOLE_USD_ROUNDING}f})")
+    print(f"{main_token_id} equivalent       : {console_round_balance(hypothetical_token)} {main_token_id}")
+    print(f"Total liquid value        : ${console_round_usd(total_value):,.{CONSOLE_USD_ROUNDING}f} USD")
+    print(f"{main_token_id} %                : {console_round_usd(token_pct):.4f}%")
+    print(f"{USDC_GECKO_ID} %                : {console_round_usd(usdc_pct):.4f}%")
     print("-" * 80)
 
     # REBALANCE OUTPUT (raw ids only)
@@ -382,7 +383,6 @@ def main():
     else:
         print("✅ Portfolio is already perfectly balanced at 50/50!")
 
-    print(f"🚀 Hypothetical all-in {main_token_id}: {console_round_balance(hypothetical_token)} {main_token_id}")
     print("=" * 80)
 
     if main_price == 0:
