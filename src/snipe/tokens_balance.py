@@ -43,7 +43,7 @@ TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 
 # RPC rate-limit handling
 RPC_RETRY_DELAY_SECONDS: int = 20
-RPC_DELAY_BETWEEN_CALLS_SECONDS: float = 1.5
+RPC_DELAY_BETWEEN_CALLS_SECONDS: float = 2
 
 # =============================================================================
 # CONSOLE ROUNDING HELPERS (display only)
@@ -370,16 +370,16 @@ def main():
     print(f"{USDC_GECKO_ID} %                : {console_round_usd(usdc_pct):.4f}%")
     print("-" * 80)
 
-    # REBALANCE OUTPUT (raw ids only)
+    # REBALANCE OUTPUT (raw ids only) — NOW INCLUDES USD SELL VALUE
     slippage_pct_str = f"{SLIPPAGE_ASSUMED*100:.1f}%"
     if sell_token > 0:
         sell_value = sell_token * main_price
         sell_pct = (sell_value / total_value * Decimal("100")) if total_value > 0 else Decimal("0")
-        print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_token)} {main_token_id} ({console_round_usd(sell_pct):.4f}% of portfolio)")
+        print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_token)} {main_token_id} (${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) ({console_round_usd(sell_pct):.4f}% of portfolio)")
     elif sell_usdc > 0:
         sell_value = sell_usdc * usdc_price
         sell_pct = (sell_value / total_value * Decimal("100")) if total_value > 0 else Decimal("0")
-        print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_usdc)} {USDC_GECKO_ID} ({console_round_usd(sell_pct):.4f}% of portfolio)")
+        print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_usdc)} {USDC_GECKO_ID} (${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) ({console_round_usd(sell_pct):.4f}% of portfolio)")
     else:
         print("✅ Portfolio is already perfectly balanced at 50/50!")
 
