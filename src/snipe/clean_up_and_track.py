@@ -117,13 +117,13 @@ def get_current_price(token_id: str) -> Decimal | None:
 
 def main() -> None:
     """
-    Main processing function.
-    (Filtering + CSV overwrite + summary unchanged)
+    Main processing function with explicit protection for 0 or 1 row CSVs.
     """
     input_path = Path(CONFIG['input_file'])
     if not input_path.exists():
         print(f"❌ Error: '{CONFIG['input_file']}' not found in the current directory.")
         print("   Make sure the CSV is in the same folder as this script.")
+        print("   → No file was modified or deleted.")
         return
 
     # Step 1: Load the raw CSV
@@ -132,49 +132,57 @@ def main() -> None:
         original_rows = list(reader)
         fieldnames = reader.fieldnames or []
 
+    # === EXPLICIT EDGE-CASE HANDLING ===
+    # If there's only one entry (or zero data rows / no CSV at all), we obviously don't delete anything.
     if not original_rows:
-        print("❌ No data rows found in the CSV.")
-        return
-
-    print(f"✅ Loaded {len(original_rows):,} total snapshot rows from {CONFIG['input_file']}")
-
-    # Step 2: Filter unchanged rows
-    filtered_rows = []
-    prev_token_bal: Decimal | None = None
-    prev_usdc_bal: Decimal | None = None
-
-    for row in original_rows:
-        try:
-            curr_token = Decimal(row['token_balance'])
-            curr_usdc = Decimal(row['usdc_balance'])
-        except (KeyError, InvalidOperation, ValueError):
-            print(f"⚠️  Skipping malformed row (cannot parse balances): {row.get('timestamp_kst', 'unknown')}")
-            continue
-
-        if (prev_token_bal is None or
-                curr_token != prev_token_bal or
-                curr_usdc != prev_usdc_bal):
-            filtered_rows.append(row)
-            prev_token_bal = curr_token
-            prev_usdc_bal = curr_usdc
-
-    removed_count = len(original_rows) - len(filtered_rows)
-    print(f"✅ Filtered down to {len(filtered_rows):,} meaningful rows "
-          f"(removed {removed_count:,} rows with no balance change)")
-
-    # Step 3: OVERWRITE original CSV with cleaned version
-    if removed_count > 0 and filtered_rows:
-        with open(input_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(filtered_rows)
-        print(f"✅ Original file '{CONFIG['input_file']}' has been overwritten with the cleaned version")
-        print("   → Only rows where FARTCOIN or USDC balance actually changed are kept")
-        print("   → All numeric values written exactly as they appeared in the original CSV (full precision preserved)")
+        print(f"✅ '{CONFIG['input_file']}' contains only a header (0 data rows).")
+        print("   → No cleaning needed - file left completely unchanged.")
+        filtered_rows = []
+    elif len(original_rows) <= 1:
+        print(f"✅ Loaded {len(original_rows):,} data row(s) from {CONFIG['input_file']}")
+        print(f"   → Only {len(original_rows)} row(s) detected. No cleaning needed - file left completely unchanged.")
+        filtered_rows = original_rows
     else:
-        print(f"✅ No changes needed – '{CONFIG['input_file']}' already contains only meaningful rows")
+        print(f"✅ Loaded {len(original_rows):,} total snapshot rows from {CONFIG['input_file']}")
 
-    # Step 4: Track added vs removed
+        # Step 2: Filter unchanged rows (only runs when we have 2+ rows)
+        filtered_rows = []
+        prev_token_bal: Decimal | None = None
+        prev_usdc_bal: Decimal | None = None
+
+        for row in original_rows:
+            try:
+                curr_token = Decimal(row['token_balance'])
+                curr_usdc = Decimal(row['usdc_balance'])
+            except (KeyError, InvalidOperation, ValueError):
+                print(f"⚠️  Skipping malformed row (cannot parse balances): {row.get('timestamp_kst', 'unknown')}")
+                continue
+
+            if (prev_token_bal is None or
+                    curr_token != prev_token_bal or
+                    curr_usdc != prev_usdc_bal):
+                filtered_rows.append(row)
+                prev_token_bal = curr_token
+                prev_usdc_bal = curr_usdc
+
+        removed_count = len(original_rows) - len(filtered_rows)
+        print(f"✅ Filtered down to {len(filtered_rows):,} meaningful rows "
+              f"(removed {removed_count:,} rows with no balance change)")
+
+        # Step 3: OVERWRITE only if we actually removed rows
+        if removed_count > 0 and filtered_rows:
+            with open(input_path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(filtered_rows)
+            print(f"✅ Original file '{CONFIG['input_file']}' has been overwritten with the cleaned version")
+            print("   → Only rows where FARTCOIN or USDC balance actually changed are kept")
+            print("   → All numeric values written exactly as they appeared in the original CSV (full precision preserved)")
+        else:
+            print(f"✅ No changes needed – '{CONFIG['input_file']}' already contains only meaningful rows")
+            filtered_rows = original_rows  # use original for summary
+
+    # Step 4: Track added vs removed (works safely for 0, 1, or many rows)
     total_fart_added = Decimal('0')
     total_fart_removed = Decimal('0')
     balance_changes = []
@@ -202,7 +210,7 @@ def main() -> None:
 
     current_price = get_current_price(CONFIG['token_id'])
 
-    # Step 5: Rich console summary (unchanged)
+    # Step 5: Rich console summary
     print("\n" + "=" * 70)
     print("FARTCOIN BALANCE FLOW SUMMARY")
     print("=" * 70)
@@ -234,7 +242,7 @@ def main() -> None:
     else:
         print("   → No balance changes detected (portfolio was completely static)")
 
-    # === NEW single combined bar graph ===
+    # === Single combined bar graph ===
     print_bar_graph(total_fart_added, total_fart_removed, CONFIG, current_price)
 
 

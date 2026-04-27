@@ -302,7 +302,8 @@ def main():
     prices_dict = get_prices(all_ids)
     usdc_price = prices_dict.get(USDC_GECKO_ID, Decimal(1))
 
-    # Select main token: first include_in_portfolio with value > $20, else fallback to FARTCOIN
+    # Select main token: first include_in_portfolio token with value > $20
+    # (No fallback to FARTCOIN anymore — exit instead)
     main_token_config = None
     for token in tokens_config:
         if not token.get("include_in_portfolio", False):
@@ -323,15 +324,9 @@ def main():
             break
 
     if main_token_config is None:
-        # Fallback to FARTCOIN
-        for token in tokens_config:
-            if token["id"] == "fartcoin":
-                main_token_config = token
-                print("⚠️  No token exceeded $20 USD. Falling back to fartcoin-usdc")
-                break
-        else:
-            print("❌ Fallback token not found. Exiting.")
-            sys.exit(1)
+        print("❌ No token exceeded $20 USD value.")
+        print("   Exiting program (no FARTCOIN fallback as requested).")
+        sys.exit(1)
 
     # Finalize main token details (raw id only)
     main_token_id: str = main_token_config["id"]
