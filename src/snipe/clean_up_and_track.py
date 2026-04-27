@@ -21,12 +21,21 @@ getcontext().prec = CONFIG['decimal_precision']
 
 def format_d(d: Decimal, places: int | None = None) -> str:
     """Format Decimal for console display ONLY.
-    Rounding happens here and nowhere else (not on calculations, not on CSV save)."""
+    Rounding happens here and nowhere else (not on calculations, not on CSV save).
+    Always includes thousands separators for the entire result (as requested)."""
     if places is None:
         places = CONFIG['summary_round_decimals']
     # quantize rounds cleanly to the requested decimal places (banker's rounding)
     rounded = d.quantize(Decimal('1.' + '0' * places))
-    return str(rounded)
+    s = str(rounded)
+    
+    # Add thousands separator (works correctly with negative numbers)
+    if '.' in s:
+        integer_part, decimal_part = s.split('.')
+        formatted_int = f"{int(integer_part):,}"
+        return f"{formatted_int}.{decimal_part}"
+    else:
+        return f"{int(s):,}"
 
 
 def main() -> None:
