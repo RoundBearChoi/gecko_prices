@@ -1,6 +1,8 @@
 from decimal import Decimal, getcontext, InvalidOperation
 import csv
 from pathlib import Path
+import json
+import urllib.request
 
 # ==================== CONFIG SECTION ====================
 # Adjust these variables here as needed. This is the only place you need to edit for basic use.
@@ -38,12 +40,28 @@ def format_d(d: Decimal, places: int | None = None) -> str:
         return f"{int(s):,}"
 
 
+def get_current_price(token_id: str) -> Decimal | None:
+    """Fetch current USD price from CoinGecko API using the exact token_id.
+    Returns Decimal on success, None on any failure (network, API error, unknown token, etc.)."""
+    try:
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={token_id}&vs_currencies=usd"
+        with urllib.request.urlopen(url, timeout=10) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            price_str = data.get(token_id, {}).get('usd')
+            if price_str is not None:
+                return Decimal(str(price_str))
+        return None
+    except Exception as e:
+        print(f"⚠️  Could not fetch current {token_id} price from CoinGecko: {e}")
+        return None
+
+
 def main() -> None:
     """
     Main processing function.
     Reads the CSV, filters unchanged balance rows, tracks FARTCOIN inflows/outflows,
     OVERWRITES the original CSV with the cleaned version (exact original strings preserved),
-    and prints a rich summary (rounded for readability only).
+    fetches current price, and prints the updated summary.
     """
     input_path = Path(CONFIG['input_file'])
     if not input_path.exists():
@@ -64,7 +82,6 @@ def main() -> None:
     print(f"✅ Loaded {len(original_rows):,} total snapshot rows from {CONFIG['input_file']}")
 
     # Step 2: Filter to keep only rows where FARTCOIN or USDC balance actually changed
-    # This removes "noise" rows where the script polled prices but no trade occurred.
     filtered_rows = []
     prev_token_bal: Decimal | None = None
     prev_usdc_bal: Decimal | None = None
@@ -77,11 +94,10 @@ def main() -> None:
             print(f"⚠️  Skipping malformed row (cannot parse balances): {row.get('timestamp_kst', 'unknown')}")
             continue
 
-        # Keep the row if it's the first one OR at least one balance changed
         if (prev_token_bal is None or
                 curr_token != prev_token_bal or
                 curr_usdc != prev_usdc_bal):
-            filtered_rows.append(row)  # store original dict → exact string values preserved
+            filtered_rows.append(row)
             prev_token_bal = curr_token
             prev_usdc_bal = curr_usdc
 
@@ -90,8 +106,6 @@ def main() -> None:
           f"(removed {removed_count:,} rows with no balance change)")
 
     # Step 3: OVERWRITE the original CSV with the filtered data
-    # IMPORTANT: We write the original row dicts exactly as read → full original precision is guaranteed.
-    # No Decimal conversion or rounding is applied to any column when saving.
     if removed_count > 0 and filtered_rows:
         with open(input_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -104,10 +118,9 @@ def main() -> None:
         print(f"✅ No changes needed – '{CONFIG['input_file']}' already contains only meaningful rows")
 
     # Step 4: Track FARTCOIN added vs removed (only between filtered rows)
-    # We use the *filtered* rows so we capture the true net effect of each trade/rebalance.
     total_fart_added = Decimal('0')
     total_fart_removed = Decimal('0')
-    balance_changes = []  # list of human-readable change descriptions
+    balance_changes = []
 
     for i in range(1, len(filtered_rows)):
         prev_token = Decimal(filtered_rows[i - 1]['token_balance'])
@@ -131,23 +144,33 @@ def main() -> None:
     else:
         initial_fart = final_fart = net_fart = Decimal('0')
 
-    # Verification: net should equal added - removed
-    verification = total_fart_added - total_fart_removed
+    current_price = get_current_price(CONFIG['token_id'])
 
     # Step 5: Rich console summary (rounded ONLY for readability)
     print("\n" + "=" * 70)
     print("FARTCOIN BALANCE FLOW SUMMARY")
     print("=" * 70)
+
+    if current_price is not None:
+        print(f"Current price ({CONFIG['token_id']})          : {format_d(current_price)} USD")
+
     print(f"Initial balance                   : {format_d(initial_fart)}")
     print(f"Final balance                     : {format_d(final_fart)}")
-    print(f"Net change                        : {format_d(net_fart)}")
+
+    # Net change with USD equivalent
+    net_str = format_d(net_fart)
+    if current_price is not None:
+        net_usd = net_fart * current_price
+        net_usd_str = format_d(net_usd)
+        net_str += f" ({net_usd_str} USD)"
+    print(f"Net change                        : {net_str}")
+
     print(f"Total added                       : {format_d(total_fart_added)}")
     print(f"Total removed                     : {format_d(total_fart_removed)}")
-    print(f"Verification (added - removed)    : {format_d(verification)}")
     print(f"Number of balance-change events   : {len(balance_changes):,}")
     print("=" * 70)
 
-    # Optional detailed changes (also using rounded display)
+    # Optional detailed changes
     if balance_changes:
         print("\n📋 DETAILED FARTCOIN FLOW EVENTS:")
         for change in balance_changes:
