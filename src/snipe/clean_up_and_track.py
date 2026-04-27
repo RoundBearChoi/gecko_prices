@@ -7,11 +7,8 @@ import urllib.request
 # ==================== CONFIG SECTION ====================
 # Adjust these variables here as needed. This is the only place you need to edit for basic use.
 CONFIG = {
-    'input_file': 'solana_portfolio_fartcoin_usdc.csv',          # Will be overwritten with filtered version
     'decimal_precision': 50,                                     # High internal precision for all calculations
     'summary_round_decimals': 8,                                 # Decimal places used ONLY when printing summary to console for readability
-    'token_id': 'fartcoin',                                      # CoinGecko API ID - never modify this value anywhere (no uppercasing or changes)
-    'stable_name': 'usdc',                                       # For readable output
 
     # === Bar graph configuration ===
     'bar_width': 50,                                             # Maximum width of the visual bar (adjust as you like)
@@ -40,11 +37,11 @@ def format_d(d: Decimal, places: int | None = None) -> str:
         return f"{int(s):,}"
 
 
-def print_bar_graph(added: Decimal, removed: Decimal, config: dict, current_price: Decimal | None = None) -> None:
+def print_bar_graph(added: Decimal, removed: Decimal, config: dict, current_price: Decimal | None = None, token_id: str = "token") -> None:
     """Print ONE single combined bar: bought (left, bar_char1) vs sold (right, bar_char2).
     Exactly 50/50 split lands in the center when volumes are equal."""
     print("\n" + "=" * 70)
-    print("FARTCOIN BOUGHT vs SOLD - SINGLE BAR (50/50 at center)")
+    print(f"{token_id} BOUGHT vs SOLD - SINGLE BAR (50/50 at center)")
     print("=" * 70)
 
     if added <= 0 and removed <= 0:
@@ -86,7 +83,7 @@ def print_bar_graph(added: Decimal, removed: Decimal, config: dict, current_pric
     print("=" * 70)
 
     # Updated total volume line with USD equivalent (based on current price)
-    total_line = f"Total volume traded   : {total_fmt} {CONFIG['token_id']}"
+    total_line = f"Total volume traded   : {total_fmt} {token_id}"
     if current_price is not None and total > 0:
         total_usd = total * current_price
         total_usd_fmt = format_d(total_usd)
@@ -96,7 +93,8 @@ def print_bar_graph(added: Decimal, removed: Decimal, config: dict, current_pric
     bought_pct = round(float(added / total * 100), 1) if total > 0 else 0.0
     sold_pct   = round(float(removed / total * 100), 1) if total > 0 else 0.0
     print(f"Ratio (buy/sell)      : {bought_pct:5.1f}% / {sold_pct:5.1f}%")
-    print(f"Net tokens            : {format_d(added - removed)}")
+    net_tokens = added - removed
+    print(f"Net tokens            : {format_d(net_tokens)} {token_id}")
 
 
 def get_current_price(token_id: str) -> Decimal | None:
@@ -115,15 +113,13 @@ def get_current_price(token_id: str) -> Decimal | None:
         return None
 
 
-def main() -> None:
+def process_portfolio(input_path: Path, token_id: str) -> None:
     """
-    Main processing function with explicit protection for 0 or 1 row CSVs.
+    Process a single portfolio CSV file for the given token_id.
+    Handles cleaning duplicate snapshots and tracks buy/sell activity.
     """
-    input_path = Path(CONFIG['input_file'])
     if not input_path.exists():
-        print(f"❌ Error: '{CONFIG['input_file']}' not found in the current directory.")
-        print("   Make sure the CSV is in the same folder as this script.")
-        print("   → No file was modified or deleted.")
+        print(f"❌ Error: '{input_path}' not found.")
         return
 
     # Step 1: Load the raw CSV
@@ -133,19 +129,18 @@ def main() -> None:
         fieldnames = reader.fieldnames or []
 
     # === EXPLICIT EDGE-CASE HANDLING ===
-    # If there's only one entry (or zero data rows / no CSV at all), we obviously don't delete anything.
     if not original_rows:
-        print(f"✅ '{CONFIG['input_file']}' contains only a header (0 data rows).")
+        print(f"✅ '{input_path.name}' contains only a header (0 data rows).")
         print("   → No cleaning needed - file left completely unchanged.")
         filtered_rows = []
     elif len(original_rows) <= 1:
-        print(f"✅ Loaded {len(original_rows):,} data row(s) from {CONFIG['input_file']}")
+        print(f"✅ Loaded {len(original_rows):,} data row(s) from {input_path.name}")
         print(f"   → Only {len(original_rows)} row(s) detected. No cleaning needed - file left completely unchanged.")
         filtered_rows = original_rows
     else:
-        print(f"✅ Loaded {len(original_rows):,} total snapshot rows from {CONFIG['input_file']}")
+        print(f"✅ Loaded {len(original_rows):,} total snapshot rows from {input_path.name}")
 
-        # Step 2: Filter unchanged rows (only runs when we have 2+ rows)
+        # Step 2: Filter unchanged rows
         filtered_rows = []
         prev_token_bal: Decimal | None = None
         prev_usdc_bal: Decimal | None = None
@@ -175,16 +170,15 @@ def main() -> None:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(filtered_rows)
-            print(f"✅ Original file '{CONFIG['input_file']}' has been overwritten with the cleaned version")
-            print("   → Only rows where FARTCOIN or USDC balance actually changed are kept")
-            print("   → All numeric values written exactly as they appeared in the original CSV (full precision preserved)")
+            print(f"✅ Original file '{input_path.name}' has been overwritten with the cleaned version")
+            print("   → Only rows where token or USDC balance actually changed are kept")
         else:
-            print(f"✅ No changes needed – '{CONFIG['input_file']}' already contains only meaningful rows")
-            filtered_rows = original_rows  # use original for summary
+            print(f"✅ No changes needed – '{input_path.name}' already contains only meaningful rows")
+            filtered_rows = original_rows
 
-    # Step 4: Track added vs removed (works safely for 0, 1, or many rows)
-    total_fart_added = Decimal('0')
-    total_fart_removed = Decimal('0')
+    # Step 4: Track added vs removed
+    total_token_added = Decimal('0')
+    total_token_removed = Decimal('0')
     balance_changes = []
 
     for i in range(1, len(filtered_rows)):
@@ -194,56 +188,89 @@ def main() -> None:
         timestamp = filtered_rows[i].get('timestamp_kst', 'unknown')
 
         if delta > 0:
-            total_fart_added += delta
-            balance_changes.append(f"{timestamp} | +{format_d(delta)} {CONFIG['token_id']} (bought)")
+            total_token_added += delta
+            balance_changes.append(f"{timestamp} | +{format_d(delta)} {token_id} (bought)")
         elif delta < 0:
             removed_amount = -delta
-            total_fart_removed += removed_amount
-            balance_changes.append(f"{timestamp} | -{format_d(removed_amount)} {CONFIG['token_id']} (sold)")
+            total_token_removed += removed_amount
+            balance_changes.append(f"{timestamp} | -{format_d(removed_amount)} {token_id} (sold)")
 
     if filtered_rows:
-        initial_fart = Decimal(filtered_rows[0]['token_balance'])
-        final_fart = Decimal(filtered_rows[-1]['token_balance'])
-        net_fart = final_fart - initial_fart
+        initial_token = Decimal(filtered_rows[0]['token_balance'])
+        final_token = Decimal(filtered_rows[-1]['token_balance'])
+        net_token = final_token - initial_token
     else:
-        initial_fart = final_fart = net_fart = Decimal('0')
+        initial_token = final_token = net_token = Decimal('0')
 
-    current_price = get_current_price(CONFIG['token_id'])
+    current_price = get_current_price(token_id)
 
     # Step 5: Rich console summary
     print("\n" + "=" * 70)
-    print("FARTCOIN BALANCE FLOW SUMMARY")
+    print(f"{token_id} BALANCE FLOW SUMMARY")
     print("=" * 70)
 
     if current_price is not None:
-        print(f"Current price ({CONFIG['token_id']})          : {format_d(current_price)} USD")
+        print(f"Current price ({token_id})          : {format_d(current_price)} USD")
 
-    print(f"Initial balance                   : {format_d(initial_fart)}")
-    print(f"Final balance                     : {format_d(final_fart)}")
+    print(f"Initial balance                   : {format_d(initial_token)}")
+    print(f"Final balance                     : {format_d(final_token)}")
 
-    net_str = format_d(net_fart)
+    net_str = format_d(net_token)
     if current_price is not None:
-        net_usd = net_fart * current_price
+        net_usd = net_token * current_price
         net_usd_str = format_d(net_usd)
         net_str += f" ({net_usd_str} USD)"
     print(f"Net change                        : {net_str}")
 
-    print(f"Total added                       : {format_d(total_fart_added)}")
-    print(f"Total removed                     : {format_d(total_fart_removed)}")
+    print(f"Total added                       : {format_d(total_token_added)}")
+    print(f"Total removed                     : {format_d(total_token_removed)}")
     print(f"Number of balance-change events   : {len(balance_changes):,}")
     print("=" * 70)
 
     if balance_changes:
-        print("\n📋 DETAILED FARTCOIN FLOW EVENTS:")
+        print("\n📋 DETAILED FLOW EVENTS:")
         for change in balance_changes:
             print(f"   {change}")
         print("=" * 70)
-        print(f"   → {len(balance_changes):,} actual FARTCOIN flow events recorded")
+        print(f"   → {len(balance_changes):,} actual {token_id} flow events recorded")
     else:
         print("   → No balance changes detected (portfolio was completely static)")
 
     # === Single combined bar graph ===
-    print_bar_graph(total_fart_added, total_fart_removed, CONFIG, current_price)
+    print_bar_graph(total_token_added, total_token_removed, CONFIG, current_price, token_id)
+
+
+def main() -> None:
+    """
+    Discovers all solana_portfolio_*_usdc.csv files and processes each one.
+    """
+    portfolio_files = sorted(Path('.').glob('solana_portfolio_*_usdc.csv'))
+
+    if not portfolio_files:
+        print(f"❌ Error: No files matching pattern 'solana_portfolio_*_usdc.csv' found in the current directory.")
+        print("   Make sure the CSVs are in the same folder as this script.")
+        return
+
+    print(f"✅ Found {len(portfolio_files):,} portfolio CSV files to process.")
+
+    for file_path in portfolio_files:
+        stem = file_path.stem
+        parts = stem.split('_')
+        
+        # Expected format: solana_portfolio_{token_id}_usdc.csv
+        if len(parts) >= 4 and parts[0] == 'solana' and parts[1] == 'portfolio' and parts[-1] == 'usdc':
+            token_id = '_'.join(parts[2:-1])
+            print(f"\n{'=' * 90}")
+            print(f"🚀 PROCESSING {token_id} ({file_path.name})")
+            print(f"{'=' * 90}\n")
+            
+            process_portfolio(file_path, token_id)
+        else:
+            print(f"⚠️  Skipping unrecognized file: {file_path.name}")
+
+    print(f"\n{'=' * 90}")
+    print("🎉 ALL PORTFOLIO FILES HAVE BEEN PROCESSED SUCCESSFULLY!")
+    print(f"{'=' * 90}")
 
 
 if __name__ == "__main__":
