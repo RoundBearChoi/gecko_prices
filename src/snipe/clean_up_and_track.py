@@ -29,7 +29,12 @@ def format_d(d: Decimal, places: int | None = None) -> str:
         places = CONFIG['summary_round_decimals']
     # quantize rounds cleanly to the requested decimal places (banker's rounding)
     rounded = d.quantize(Decimal('1.' + '0' * places))
-    s = str(rounded)
+    
+    # CRITICAL FIX: force fixed-point notation (:f)
+    # This turns '0E-8', '1.23E+4', etc. into clean '0.00000000' / '1234.00000000'
+    # Guarantees the rest of the function never sees scientific notation.
+    # This fixes the Linux/WSL difference you were seeing.
+    s = f"{rounded:f}"
     
     # Add thousands separator (works correctly with negative numbers)
     if '.' in s:
