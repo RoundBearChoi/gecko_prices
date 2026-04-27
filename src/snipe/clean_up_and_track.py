@@ -12,8 +12,11 @@ CONFIG = {
     'summary_round_decimals': 8,                                 # Decimal places used ONLY when printing summary to console for readability
     'token_id': 'fartcoin',                                      # CoinGecko API ID - never modify this value anywhere (no uppercasing or changes)
     'stable_name': 'usdc',                                       # For readable output
-    # Future extensions you can add here:
-    # 'minimum_change_threshold': Decimal('0.000001'),  # optional filter for tiny noise
+
+    # === Bar graph configuration ===
+    'bar_width': 50,                                             # Maximum width of the visual bar (adjust as you like)
+    'bar_char1': "█",                                            # LEFT side = Bought portion
+    'bar_char2': "─",                                            # RIGHT side = Sold portion
 }
 # =======================================================
 
@@ -27,22 +30,66 @@ def format_d(d: Decimal, places: int | None = None) -> str:
     Always includes thousands separators for the entire result (as requested)."""
     if places is None:
         places = CONFIG['summary_round_decimals']
-    # quantize rounds cleanly to the requested decimal places (banker's rounding)
     rounded = d.quantize(Decimal('1.' + '0' * places))
-    
-    # CRITICAL FIX: force fixed-point notation (:f)
-    # This turns '0E-8', '1.23E+4', etc. into clean '0.00000000' / '1234.00000000'
-    # Guarantees the rest of the function never sees scientific notation.
-    # This fixes the Linux/WSL difference you were seeing.
     s = f"{rounded:f}"
-    
-    # Add thousands separator (works correctly with negative numbers)
     if '.' in s:
         integer_part, decimal_part = s.split('.')
         formatted_int = f"{int(integer_part):,}"
         return f"{formatted_int}.{decimal_part}"
     else:
         return f"{int(s):,}"
+
+
+def print_bar_graph(added: Decimal, removed: Decimal, config: dict) -> None:
+    """Print ONE single combined bar: bought (left, bar_char1) vs sold (right, bar_char2).
+    Exactly 50/50 split lands in the center when volumes are equal."""
+    print("\n" + "=" * 70)
+    print("FARTCOIN BOUGHT vs SOLD - SINGLE BAR (50/50 at center)")
+    print("=" * 70)
+
+    if added <= 0 and removed <= 0:
+        print("   → No buy/sell activity to visualize")
+        print("=" * 70)
+        return
+
+    total = added + removed
+    width = config.get('bar_width', 50)
+    char_bought = config.get('bar_char1', '█')
+    char_sold   = config.get('bar_char2', '─')
+
+    if total > 0:
+        bought_ratio = float(added / total)
+        bought_len = round(bought_ratio * width)
+        sold_len = width - bought_len
+        # Guard against tiny values disappearing completely
+        if added > 0 and bought_len == 0:
+            bought_len = 1
+            sold_len = width - 1
+        if removed > 0 and bought_len == width:
+            bought_len = width - 1
+            sold_len = 1
+    else:
+        bought_len = sold_len = width // 2
+
+    bar = char_bought * bought_len + char_sold * sold_len
+
+    added_fmt = format_d(added)
+    removed_fmt = format_d(removed)
+    total_fmt = format_d(total)
+
+    # Labels above the bar
+    half = width // 2
+    print(f"{'BOUGHT':<{half}}{'SOLD':>{half}}")
+    print(bar)
+    # Amounts aligned under each half
+    print(f"{added_fmt:<{half}}{removed_fmt:>{half}}")
+    print("=" * 70)
+
+    print(f"Total volume traded   : {total_fmt} {CONFIG['token_id']}")
+    bought_pct = round(float(added / total * 100), 1) if total > 0 else 0.0
+    sold_pct   = round(float(removed / total * 100), 1) if total > 0 else 0.0
+    print(f"Ratio (buy/sell)      : {bought_pct:5.1f}% / {sold_pct:5.1f}%")
+    print(f"Net tokens            : {format_d(added - removed)}")
 
 
 def get_current_price(token_id: str) -> Decimal | None:
@@ -64,9 +111,7 @@ def get_current_price(token_id: str) -> Decimal | None:
 def main() -> None:
     """
     Main processing function.
-    Reads the CSV, filters unchanged balance rows, tracks FARTCOIN inflows/outflows,
-    OVERWRITES the original CSV with the cleaned version (exact original strings preserved),
-    fetches current price, and prints the updated summary.
+    (Filtering + CSV overwrite + summary unchanged)
     """
     input_path = Path(CONFIG['input_file'])
     if not input_path.exists():
@@ -74,7 +119,7 @@ def main() -> None:
         print("   Make sure the CSV is in the same folder as this script.")
         return
 
-    # Step 1: Load the raw CSV (keep original string values for filtered output)
+    # Step 1: Load the raw CSV
     with open(input_path, 'r', newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         original_rows = list(reader)
@@ -86,7 +131,7 @@ def main() -> None:
 
     print(f"✅ Loaded {len(original_rows):,} total snapshot rows from {CONFIG['input_file']}")
 
-    # Step 2: Filter to keep only rows where FARTCOIN or USDC balance actually changed
+    # Step 2: Filter unchanged rows
     filtered_rows = []
     prev_token_bal: Decimal | None = None
     prev_usdc_bal: Decimal | None = None
@@ -110,7 +155,7 @@ def main() -> None:
     print(f"✅ Filtered down to {len(filtered_rows):,} meaningful rows "
           f"(removed {removed_count:,} rows with no balance change)")
 
-    # Step 3: OVERWRITE the original CSV with the filtered data
+    # Step 3: OVERWRITE original CSV with cleaned version
     if removed_count > 0 and filtered_rows:
         with open(input_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -122,7 +167,7 @@ def main() -> None:
     else:
         print(f"✅ No changes needed – '{CONFIG['input_file']}' already contains only meaningful rows")
 
-    # Step 4: Track FARTCOIN added vs removed (only between filtered rows)
+    # Step 4: Track added vs removed
     total_fart_added = Decimal('0')
     total_fart_removed = Decimal('0')
     balance_changes = []
@@ -141,7 +186,6 @@ def main() -> None:
             total_fart_removed += removed_amount
             balance_changes.append(f"{timestamp} | -{format_d(removed_amount)} {CONFIG['token_id']} (sold)")
 
-    # Final calculations (still using full Decimal precision)
     if filtered_rows:
         initial_fart = Decimal(filtered_rows[0]['token_balance'])
         final_fart = Decimal(filtered_rows[-1]['token_balance'])
@@ -151,7 +195,7 @@ def main() -> None:
 
     current_price = get_current_price(CONFIG['token_id'])
 
-    # Step 5: Rich console summary (rounded ONLY for readability)
+    # Step 5: Rich console summary (unchanged)
     print("\n" + "=" * 70)
     print("FARTCOIN BALANCE FLOW SUMMARY")
     print("=" * 70)
@@ -162,7 +206,6 @@ def main() -> None:
     print(f"Initial balance                   : {format_d(initial_fart)}")
     print(f"Final balance                     : {format_d(final_fart)}")
 
-    # Net change with USD equivalent
     net_str = format_d(net_fart)
     if current_price is not None:
         net_usd = net_fart * current_price
@@ -175,17 +218,17 @@ def main() -> None:
     print(f"Number of balance-change events   : {len(balance_changes):,}")
     print("=" * 70)
 
-    # Optional detailed changes
     if balance_changes:
         print("\n📋 DETAILED FARTCOIN FLOW EVENTS:")
         for change in balance_changes:
             print(f"   {change}")
         print("=" * 70)
-
-    if balance_changes:
         print(f"   → {len(balance_changes):,} actual FARTCOIN flow events recorded")
     else:
         print("   → No balance changes detected (portfolio was completely static)")
+
+    # === NEW single combined bar graph ===
+    print_bar_graph(total_fart_added, total_fart_removed, CONFIG)
 
 
 if __name__ == "__main__":
