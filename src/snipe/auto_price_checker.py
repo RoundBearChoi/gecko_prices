@@ -5,6 +5,7 @@ import time
 import sys
 import requests
 import getpass
+import subprocess  # ← Used for native Linux audio playback
 from datetime import datetime
 from decimal import Decimal, getcontext
 
@@ -14,6 +15,10 @@ UPDATE_INTERVAL_MINUTES = 4          # How often to fetch fresh prices from Coin
 BAR_WIDTH = 50                       # Width of the progress bar (characters)
 CLEAR_SCREEN_ON_UPDATE = True        # Linux-optimized: clears terminal for a clean dashboard each cycle
 USE_COLORS = True                    # Enable ANSI colors (perfect for Linux terminals)
+
+# Sound alert configuration
+PRICE_CHANGE_THRESHOLD_PERCENT = 0.1  # Play sound if any token's price changes by more than this % (absolute)
+SOUND_FILE = "kim_dust.mp3"           # Sound file located in the same folder as this script
 # =======================================================
 
 # ANSI color codes (Linux terminals love these)
@@ -99,6 +104,42 @@ def fetch_current_prices(token_ids, api_key):
         print(f"⚠️  Unexpected error fetching prices: {e}")
         return {}
 
+def play_alert_sound():
+    """Play alert using native Linux audio tools — zero extra pip packages needed."""
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        sound_path = os.path.join(script_dir, SOUND_FILE)
+        
+        if not os.path.exists(sound_path):
+            print(f"⚠️  Sound file not found: {sound_path}")
+            print(f"🔊  BIG PRICE MOVE DETECTED! (> {PRICE_CHANGE_THRESHOLD_PERCENT}%)")
+            return
+        
+        # Try several reliable Linux audio players (non-blocking)
+        player_commands = [
+            ['paplay', sound_path],                                           # PulseAudio (default on Ubuntu/WSL)
+            ['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', sound_path],  # ffmpeg (best MP3 support)
+            ['mpg123', '--quiet', sound_path],                                # Dedicated MP3 player
+            ['mpv', '--no-terminal', '--really-quiet', sound_path],
+        ]
+        
+        for cmd in player_commands:
+            try:
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                print(f"🔊  ALERT SOUND: Significant price movement (> {PRICE_CHANGE_THRESHOLD_PERCENT}%) detected! [{cmd[0]}]")
+                return  # Success — stop trying other players
+            except FileNotFoundError:
+                continue  # Player not installed, try next one
+        
+        # Fallback if no audio player is installed
+        print(f"🔊  BIG PRICE MOVE DETECTED! (> {PRICE_CHANGE_THRESHOLD_PERCENT}%)")
+        print("   ⚠️  No audio player found. Quick fix:")
+        print("      sudo apt update && sudo apt install ffmpeg   # (recommended)")
+        
+    except Exception as e:
+        print(f"⚠️  Error trying to play sound: {e}")
+        print(f"🔊  BIG PRICE MOVE DETECTED! (> {PRICE_CHANGE_THRESHOLD_PERCENT}%)")
+
 def print_status(last_prices, current_prices, token_ids, timestamp, api_key_used):
     """Clean table with fixed delta column — all math uses full-precision Decimal."""
     if CLEAR_SCREEN_ON_UPDATE:
@@ -110,6 +151,8 @@ def print_status(last_prices, current_prices, token_ids, timestamp, api_key_used
     print("=" * 100)
     print(f"{'Token ID':<25} {'Last Recorded (USD)':<20} {'Current Price (USD)':<20} {'Δ %':<15}")
     print("-" * 100)
+    
+    big_move_detected = False
     
     for tid in sorted(token_ids):
         last_p = last_prices.get(tid)
@@ -124,6 +167,11 @@ def print_status(last_prices, current_prices, token_ids, timestamp, api_key_used
         
         # Delta calculation with full Decimal precision (no rounding here)
         delta_pct = ((curr_p - last_p) / last_p) * Decimal('100')
+        
+        # Check for big price movement
+        if abs(delta_pct) >= Decimal(str(PRICE_CHANGE_THRESHOLD_PERCENT)):
+            big_move_detected = True
+        
         delta_str = f"{delta_pct:+.4f}%"
         indicator = "🟢" if delta_pct >= 0 else "🔴"
         
@@ -140,6 +188,10 @@ def print_status(last_prices, current_prices, token_ids, timestamp, api_key_used
     print("=" * 100)
     count = len(token_ids)
     print(f"📊 Monitoring {count} token{'s' if count != 1 else ''} • Next update in {UPDATE_INTERVAL_MINUTES} minutes")
+    
+    # Play sound alert if significant move detected
+    if big_move_detected:
+        play_alert_sound()
 
 def countdown_timer(seconds):
     """Live ticking timer + progress bar (unchanged — works perfectly)."""
@@ -165,6 +217,7 @@ def main():
     print(f"   • Update frequency: every {UPDATE_INTERVAL_MINUTES} minutes")
     print(f"   • Token IDs kept exactly as in filename")
     print(f"   • Using Decimal + API precision=full for full price precision")
+    print(f"   • Sound alerts enabled: >{PRICE_CHANGE_THRESHOLD_PERCENT}% moves will play {SOUND_FILE} (native Linux)")
     print(f"   • Press Ctrl+C to stop\n")
     
     # ==================== SECURE API KEY HANDLING ====================
