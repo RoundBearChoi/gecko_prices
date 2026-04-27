@@ -8,7 +8,7 @@ CONFIG = {
     'input_file': 'solana_portfolio_fartcoin_usdc.csv',          # Will be overwritten with filtered version
     'decimal_precision': 50,                                     # High internal precision for all calculations
     'summary_round_decimals': 8,                                 # Decimal places used ONLY when printing summary to console for readability
-    'token_name': 'fartcoin',                                    # For readable output
+    'token_id': 'fartcoin',                                      # CoinGecko API ID - never modify this value anywhere (no uppercasing or changes)
     'stable_name': 'usdc',                                       # For readable output
     # Future extensions you can add here:
     # 'minimum_change_threshold': Decimal('0.000001'),  # optional filter for tiny noise
@@ -108,11 +108,11 @@ def main() -> None:
 
         if delta > 0:
             total_fart_added += delta
-            balance_changes.append(f"{timestamp} | +{format_d(delta)} {CONFIG['token_name'].upper()} (bought)")
+            balance_changes.append(f"{timestamp} | +{format_d(delta)} {CONFIG['token_id']} (bought)")
         elif delta < 0:
             removed_amount = -delta
             total_fart_removed += removed_amount
-            balance_changes.append(f"{timestamp} | -{format_d(removed_amount)} {CONFIG['token_name'].upper()} (sold)")
+            balance_changes.append(f"{timestamp} | -{format_d(removed_amount)} {CONFIG['token_id']} (sold)")
 
     # Final calculations (still using full Decimal precision)
     if filtered_rows:
