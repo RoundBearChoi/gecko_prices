@@ -86,21 +86,20 @@ def _fetch_chunk(coin_id: str, from_ts: int, to_ts: int, api_key: str) -> Dict:
 
 
 def fetch_price_history_for_token(token: Dict, api_key: str) -> pd.DataFrame:
-    """Fetch full hourly history with Decimal precision."""
-    symbol = token.get("symbol", "unknown").upper()
+    """Fetch full hourly history with Decimal precision using coin_id only."""
     coin_id = token.get("id")
     if not coin_id:
-        print(f"⚠️  Skipping {symbol} — no coin_id in JSON")
+        print(f"⚠️  Skipping token — no coin_id in JSON")
         return pd.DataFrame()
 
     os.makedirs(CONFIG["OUTPUT_DIR"], exist_ok=True)
-    output_file = Path(CONFIG["OUTPUT_DIR"]) / f"{coin_id}.csv"   # ← CHANGED: use id instead of symbol
+    output_file = Path(CONFIG["OUTPUT_DIR"]) / f"{coin_id}.csv"
 
     if output_file.exists() and not CONFIG["FORCE_FRESH_DOWNLOAD"]:
         print(f"✅ {output_file.name} already exists (set FORCE_FRESH_DOWNLOAD=True to override)")
         return pd.read_csv(output_file, parse_dates=["datetime"])
 
-    print(f"\n📡 Fetching ≈{CONFIG['MONTHS_BACK']} months of **hourly** data for {symbol} ({coin_id})")
+    print(f"\n📡 Fetching ≈{CONFIG['MONTHS_BACK']} months of **hourly** data for {coin_id}")
     print(f"   Using precision={CONFIG['PRECISION']} + Decimal parsing")
 
     end_date = datetime.now(timezone.utc)
@@ -129,7 +128,7 @@ def fetch_price_history_for_token(token: Dict, api_key: str) -> pd.DataFrame:
         time.sleep(CONFIG["SLEEP_BETWEEN_CALLS"])
 
     if not all_prices:
-        print(f"❌ No data received for {symbol}")
+        print(f"❌ No data received for {coin_id}")
         return pd.DataFrame()
 
     # Build DataFrame — timestamp stays int, prices stay Decimal (object dtype)
@@ -199,7 +198,8 @@ def main():
             print("\n⛔ Stopped by user.")
             break
         except Exception as e:
-            print(f"❌ Error processing {token.get('symbol', 'unknown')}: {e}")
+            coin_id = token.get("id", "unknown")
+            print(f"❌ Error processing {coin_id}: {e}")
 
     print("=" * 70)
     print(f"🎉 FINISHED! {success}/{len(tokens)} tokens saved successfully.")
