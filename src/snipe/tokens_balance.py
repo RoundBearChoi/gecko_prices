@@ -136,7 +136,7 @@ def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
                 except (KeyError, TypeError, IndexError):
                     continue
         
-        print(f"    Processed {accounts_found} token account(s) from {program_id[:8]}... program")
+        print(f"    Processed {accounts_found} token account(s) from {program_id[:8]} program")
         
         print(f"    Waiting {RPC_DELAY_BETWEEN_CALLS_SECONDS} seconds before next RPC call...")
         time.sleep(RPC_DELAY_BETWEEN_CALLS_SECONDS)
@@ -393,15 +393,20 @@ def main():
     starting_point_filename = f"starting_point_{main_token_id}.csv"
     starting_point_path = os.path.join(CSV_OUTPUT_DIR, starting_point_filename)
     starting_equiv = hypothetical_token
+    starting_total_usd = total_value   # default to current (delta = 0 on first run)
 
     if os.path.exists(starting_point_path):
         try:
             with open(starting_point_path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 rows = list(reader)
-                if rows and "hypothetical_token_equivalent" in rows[0]:
-                    starting_equiv = Decimal(rows[0]["hypothetical_token_equivalent"])
-                    print(f"✅ Loaded starting {main_token_id} equivalent baseline: {console_round_balance(starting_equiv)}")
+                if rows:
+                    if "hypothetical_token_equivalent" in rows[0]:
+                        starting_equiv = Decimal(rows[0]["hypothetical_token_equivalent"])
+                        print(f"✅ Loaded starting {main_token_id} equivalent baseline: {console_round_balance(starting_equiv)}")
+                    if "total_value_usd" in rows[0]:
+                        starting_total_usd = Decimal(rows[0]["total_value_usd"])
+                        print(f"✅ Loaded starting USD equivalent baseline: ${console_round_usd(starting_total_usd):,.{CONSOLE_USD_ROUNDING}f}")
         except Exception as e:
             print(f"⚠️  Could not read starting_point_{main_token_id}.csv: {e}")
     else:
@@ -417,7 +422,8 @@ def main():
 
     # Delta calculation
     equiv_delta = hypothetical_token - starting_equiv
-    usd_delta = equiv_delta * main_price if main_price > 0 else Decimal("0")
+    usd_delta = equiv_delta * main_price if main_price > 0 else Decimal("0")          # existing (token equiv → USD)
+    usd_equiv_delta = total_value - starting_total_usd                                 # NEW: actual portfolio USD delta
 
     # Summary (pure raw ids only)
     print("\n" + "=" * 80)
@@ -431,7 +437,8 @@ def main():
     print(f"{USDC_GECKO_ID}                  : {console_round_balance(usdc_balance)} (${console_round_usd(usdc_value):,.{CONSOLE_USD_ROUNDING}f})")
     print(f"{main_token_id} equivalent       : {console_round_balance(hypothetical_token)} {main_token_id}")
     print(f"{main_token_id} equiv delta      : {console_round_balance(equiv_delta)} {main_token_id} (${console_round_usd(usd_delta):+,.{CONSOLE_USD_ROUNDING}f})")
-    print(f"Total liquid value        : ${console_round_usd(total_value):,.{CONSOLE_USD_ROUNDING}f} USD")
+    print(f"USD equivalent            : ${console_round_usd(total_value):,.{CONSOLE_USD_ROUNDING}f} USD")
+    print(f"USD equivalent delta      : ${console_round_usd(usd_equiv_delta):+,.{CONSOLE_USD_ROUNDING}f} USD")
     print(f"{main_token_id} %                : {console_round_usd(token_pct):.4f}%")
     print(f"{USDC_GECKO_ID} %                : {console_round_usd(usdc_pct):.4f}%")
     print("-" * 80)
