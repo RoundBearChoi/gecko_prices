@@ -40,7 +40,7 @@ def format_d(d: Decimal, places: int | None = None) -> str:
         return f"{int(s):,}"
 
 
-def print_bar_graph(added: Decimal, removed: Decimal, config: dict) -> None:
+def print_bar_graph(added: Decimal, removed: Decimal, config: dict, current_price: Decimal | None = None) -> None:
     """Print ONE single combined bar: bought (left, bar_char1) vs sold (right, bar_char2).
     Exactly 50/50 split lands in the center when volumes are equal."""
     print("\n" + "=" * 70)
@@ -85,7 +85,14 @@ def print_bar_graph(added: Decimal, removed: Decimal, config: dict) -> None:
     print(f"{added_fmt:<{half}}{removed_fmt:>{half}}")
     print("=" * 70)
 
-    print(f"Total volume traded   : {total_fmt} {CONFIG['token_id']}")
+    # Updated total volume line with USD equivalent (based on current price)
+    total_line = f"Total volume traded   : {total_fmt} {CONFIG['token_id']}"
+    if current_price is not None and total > 0:
+        total_usd = total * current_price
+        total_usd_fmt = format_d(total_usd)
+        total_line += f" ({total_usd_fmt} USD)"
+    print(total_line)
+
     bought_pct = round(float(added / total * 100), 1) if total > 0 else 0.0
     sold_pct   = round(float(removed / total * 100), 1) if total > 0 else 0.0
     print(f"Ratio (buy/sell)      : {bought_pct:5.1f}% / {sold_pct:5.1f}%")
@@ -228,7 +235,7 @@ def main() -> None:
         print("   → No balance changes detected (portfolio was completely static)")
 
     # === NEW single combined bar graph ===
-    print_bar_graph(total_fart_added, total_fart_removed, CONFIG)
+    print_bar_graph(total_fart_added, total_fart_removed, CONFIG, current_price)
 
 
 if __name__ == "__main__":
