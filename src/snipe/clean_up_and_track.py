@@ -5,36 +5,21 @@ import json
 import urllib.request
 
 # ==================== CONFIG SECTION ====================
-# Adjust these variables here as needed. This is the only place you need to edit for basic use.
 CONFIG = {
-    'decimal_precision': 50,                                     # High internal precision for all calculations
-    'summary_round_decimals': 8,                                 # Decimal places used ONLY when printing summary to console for readability
+    'decimal_precision': 50,
+    'summary_round_decimals': 8,
 
     # === Bar graph configuration ===
-    'bar_width': 50,                                             # Maximum width of the visual bar (adjust as you like)
-    'bar_char1': "█",                                            # LEFT side = Bought portion
-    'bar_char2': "─",                                            # RIGHT side = Sold portion
+    'bar_width': 50,
+    'bar_char1': "█",
+    'bar_char2': "─",
 }
-
-# New clean field list (matches the updated tokens_balance.py)
-# sell_token_to_50_50 and sell_usdc_to_50_50 have been removed
-CSV_FIELDNAMES: list[str] = [
-    "timestamp_kst", "wallet_address", "token_id",
-    "token_balance", "usdc_balance",
-    "token_price_usd", "usdc_price_usd", "token_value_usd",
-    "usdc_value_usd", "total_value_usd", "token_pct", "usdc_pct",
-    "hypothetical_token_equivalent", "assumed_slippage"
-]
 # =======================================================
 
-# Set global Decimal precision (only affects calculations, never the source data)
 getcontext().prec = CONFIG['decimal_precision']
 
 
 def format_d(d: Decimal, places: int | None = None) -> str:
-    """Format Decimal for console display ONLY.
-    Rounding happens here and nowhere else (not on calculations, not on CSV save).
-    Always includes thousands separators for the entire result (as requested)."""
     if places is None:
         places = CONFIG['summary_round_decimals']
     rounded = d.quantize(Decimal('1.' + '0' * places))
@@ -48,8 +33,6 @@ def format_d(d: Decimal, places: int | None = None) -> str:
 
 
 def print_bar_graph(added: Decimal, removed: Decimal, config: dict, current_price: Decimal | None = None, token_id: str = "token") -> None:
-    """Print ONE single combined bar: bought (left, bar_char1) vs sold (right, bar_char2).
-    Exactly 50/50 split lands in the center when volumes are equal."""
     print("\n" + "=" * 70)
     print(f"{token_id} BOUGHT vs SOLD - SINGLE BAR (50/50 at center)")
     print("=" * 70)
@@ -68,7 +51,6 @@ def print_bar_graph(added: Decimal, removed: Decimal, config: dict, current_pric
         bought_ratio = float(added / total)
         bought_len = round(bought_ratio * width)
         sold_len = width - bought_len
-        # Guard against tiny values disappearing completely
         if added > 0 and bought_len == 0:
             bought_len = 1
             sold_len = width - 1
@@ -84,15 +66,12 @@ def print_bar_graph(added: Decimal, removed: Decimal, config: dict, current_pric
     removed_fmt = format_d(removed)
     total_fmt = format_d(total)
 
-    # Labels above the bar
     half = width // 2
     print(f"{'BOUGHT':<{half}}{'SOLD':>{half}}")
     print(bar)
-    # Amounts aligned under each half
     print(f"{added_fmt:<{half}}{removed_fmt:>{half}}")
     print("=" * 70)
 
-    # Updated total volume line with USD equivalent (based on current price)
     total_line = f"Total volume traded   : {total_fmt} {token_id}"
     if current_price is not None and total > 0:
         total_usd = total * current_price
@@ -108,8 +87,6 @@ def print_bar_graph(added: Decimal, removed: Decimal, config: dict, current_pric
 
 
 def get_current_price(token_id: str) -> Decimal | None:
-    """Fetch current USD price from CoinGecko API using the exact token_id.
-    Returns Decimal on success, None on any failure (network, API error, unknown token, etc.)."""
     try:
         url = f"https://api.coingecko.com/api/v3/simple/price?ids={token_id}&vs_currencies=usd"
         with urllib.request.urlopen(url, timeout=10) as response:
@@ -124,34 +101,26 @@ def get_current_price(token_id: str) -> Decimal | None:
 
 
 def process_portfolio(input_path: Path, token_id: str) -> None:
-    """
-    Process a single portfolio CSV file for the given token_id.
-    Handles cleaning duplicate snapshots and tracks buy/sell activity.
-    Now also removes the obsolete sell_token_to_50_50 / sell_usdc_to_50_50 columns.
-    """
     if not input_path.exists():
         print(f"❌ Error: '{input_path}' not found.")
         return
 
-    # Step 1: Load the raw CSV
     with open(input_path, 'r', newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         original_rows = list(reader)
-        original_fieldnames = reader.fieldnames or []
+        fieldnames = reader.fieldnames or []
 
-    # === EXPLICIT EDGE-CASE HANDLING ===
     if not original_rows:
         print(f"'{input_path.name}' contains only a header (0 data rows).")
-        print("   → No cleaning needed - file left completely unchanged.")
+        print("   → File left completely unchanged.")
         filtered_rows = []
     elif len(original_rows) <= 1:
         print(f"Loaded {len(original_rows):,} data row(s) from {input_path.name}")
-        print(f"   → Only {len(original_rows)} row(s) detected. No cleaning needed - file left completely unchanged.")
+        print(f"   → No cleaning needed - file left completely unchanged.")
         filtered_rows = original_rows
     else:
         print(f"Loaded {len(original_rows):,} total snapshot rows from {input_path.name}")
 
-        # Step 2: Filter unchanged rows
         filtered_rows = []
         prev_token_bal: Decimal | None = None
         prev_usdc_bal: Decimal | None = None
@@ -161,7 +130,7 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
                 curr_token = Decimal(row['token_balance'])
                 curr_usdc = Decimal(row['usdc_balance'])
             except (KeyError, InvalidOperation, ValueError):
-                print(f"⚠️  Skipping malformed row (cannot parse balances): {row.get('timestamp_kst', 'unknown')}")
+                print(f"⚠️  Skipping malformed row: {row.get('timestamp_kst', 'unknown')}")
                 continue
 
             if (prev_token_bal is None or
@@ -175,19 +144,16 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
         print(f"Filtered down to {len(filtered_rows):,} meaningful rows "
               f"(removed {removed_count:,} rows with no balance change)")
 
-        # Step 3: OVERWRITE with CLEAN field list (removes obsolete sell columns)
         if removed_count > 0 and filtered_rows:
             with open(input_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
+                writer = csv.DictWriter(f, fieldnames=fieldnames)   # keep original columns
                 writer.writeheader()
                 writer.writerows(filtered_rows)
-            print(f"✅ Cleaned '{input_path.name}' → obsolete sell_* columns removed")
-            print("   → Only rows where token or USDC balance actually changed are kept")
+            print(f"✅ Cleaned '{input_path.name}' (duplicate snapshots removed)")
         else:
-            print(f"No changes needed – '{input_path.name}' already contains only meaningful rows")
-            filtered_rows = original_rows
+            print(f"No changes needed – '{input_path.name}' already clean")
 
-    # Step 4: Track added vs removed (unchanged logic)
+    # Track buy/sell activity (unchanged)
     total_token_added = Decimal('0')
     total_token_removed = Decimal('0')
     balance_changes = []
@@ -215,7 +181,6 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
 
     current_price = get_current_price(token_id)
 
-    # Step 5: Rich console summary (unchanged)
     print("\n" + "=" * 70)
     print(f"{token_id} BALANCE FLOW SUMMARY")
     print("=" * 70)
@@ -247,19 +212,14 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
     else:
         print("   → No balance changes detected (portfolio was completely static)")
 
-    # === Single combined bar graph ===
     print_bar_graph(total_token_added, total_token_removed, CONFIG, current_price, token_id)
 
 
 def main() -> None:
-    """
-    Discovers all solana_portfolio_*_usdc.csv files and processes each one.
-    """
     portfolio_files = sorted(Path('.').glob('solana_portfolio_*_usdc.csv'))
 
     if not portfolio_files:
-        print(f"❌ Error: No files matching pattern 'solana_portfolio_*_usdc.csv' found in the current directory.")
-        print("   Make sure the CSVs are in the same folder as this script.")
+        print(f"❌ Error: No files matching pattern 'solana_portfolio_*_usdc.csv' found.")
         return
 
     print(f"✅ Found {len(portfolio_files):,} portfolio CSV files to process.")
@@ -268,7 +228,6 @@ def main() -> None:
         stem = file_path.stem
         parts = stem.split('_')
         
-        # Expected format: solana_portfolio_{token_id}_usdc.csv
         if len(parts) >= 4 and parts[0] == 'solana' and parts[1] == 'portfolio' and parts[-1] == 'usdc':
             token_id = '_'.join(parts[2:-1])
             print(f"\n{'=' * 90}")

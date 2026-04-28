@@ -16,7 +16,6 @@ from zoneinfo import ZoneInfo
 USDC_MINT: str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 USDC_GECKO_ID: str = "usd-coin"
 
-# Smart relative path - automatically finds tokens_list.json next to this script
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TOKENS_LIST_PATH: str = os.path.join(SCRIPT_DIR, "tokens_list.json")
 
@@ -25,28 +24,22 @@ COINGECKO_BASE: str = "https://api.coingecko.com/api/v3"
 
 CSV_OUTPUT_DIR: str = "."
 
-# Assumed slippage for 50/50 rebalance calculations
-SLIPPAGE_ASSUMED: Decimal = Decimal("0.01")  # 1% — change as needed
+SLIPPAGE_ASSUMED: Decimal = Decimal("0.01")
 
-# Console display rounding (math + CSV always use full Decimal precision)
-CONSOLE_BALANCE_ROUNDING: int = 6   # Token quantities 
-CONSOLE_USD_ROUNDING: int = 3       # USD values, prices, total value
+CONSOLE_BALANCE_ROUNDING: int = 6
+CONSOLE_USD_ROUNDING: int = 3
 
-# Absolute maximum precision for all internal math
 getcontext().prec = 50
 
 KST_TZ = ZoneInfo("Asia/Seoul")
 
-# Token program IDs for maximum coverage
 SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 
-# RPC rate-limit handling
 RPC_RETRY_DELAY_SECONDS: int = 20
 RPC_DELAY_BETWEEN_CALLS_SECONDS: float = 2
 
-# Shared fieldnames for BOTH portfolio CSV and starting_point CSV
-# (sell_token_to_50_50 and sell_usdc_to_50_50 have been removed)
+# Clean field list (sell_token_to_50_50 and sell_usdc_to_50_50 removed)
 CSV_FIELDNAMES: list[str] = [
     "timestamp_kst", "wallet_address", "token_id",
     "token_balance", "usdc_balance",
@@ -55,22 +48,12 @@ CSV_FIELDNAMES: list[str] = [
     "hypothetical_token_equivalent", "assumed_slippage"
 ]
 
-# =============================================================================
-# CONSOLE ROUNDING HELPERS (display only)
-# =============================================================================
 def console_round_balance(value: Decimal) -> Decimal:
-    """Round token balance quantities for console display ONLY."""
     return value.quantize(Decimal('1.' + '0' * CONSOLE_BALANCE_ROUNDING))
 
-
 def console_round_usd(value: Decimal) -> Decimal:
-    """Round USD values/prices for console display ONLY."""
     return value.quantize(Decimal('1.' + '0' * CONSOLE_USD_ROUNDING))
 
-
-# =============================================================================
-# RETRY DECORATOR
-# =============================================================================
 def retry(max_retries: int = 5, delay: int = RPC_RETRY_DELAY_SECONDS):
     def decorator(func):
         @wraps(func)
@@ -88,13 +71,8 @@ def retry(max_retries: int = 5, delay: int = RPC_RETRY_DELAY_SECONDS):
         return wrapper
     return decorator
 
-# =============================================================================
-# BULK TOKEN BALANCE FETCH (Only 2 RPC calls total)
-# =============================================================================
-
 @retry()
 def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
-    """Fetch ALL token accounts from BOTH programs in ONLY 2 RPC calls."""
     token_data: dict[str, dict] = {}
     programs = [SPL_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]
     
@@ -137,49 +115,32 @@ def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
                     continue
         
         print(f"    Processed {accounts_found} token account(s) from {program_id[:8]} program")
-        
         print(f"    Waiting {RPC_DELAY_BETWEEN_CALLS_SECONDS} seconds before next RPC call...")
         time.sleep(RPC_DELAY_BETWEEN_CALLS_SECONDS)
 
     return token_data
 
-
 def get_raw_token_balance(token_accounts: dict, mint: str) -> Decimal:
-    """Pure function: Get balance for a mint without any printing or side effects."""
     if mint not in token_accounts:
         return Decimal("0")
-    
     info = token_accounts[mint]
     raw = Decimal(info.get("raw_amount", "0"))
     decimals = int(info.get("decimals", 6))
-    
-    balance = raw / Decimal(10 ** decimals)
-    return balance
-
+    return raw / Decimal(10 ** decimals)
 
 def get_specific_balance(token_accounts: dict, mint: str, token_id: str) -> Decimal:
-    """Extract balance for a specific mint with console output (raw id only)."""
     if mint not in token_accounts:
         print(f"    No {token_id} accounts found.")
         return Decimal("0")
-    
     info = token_accounts[mint]
     raw = Decimal(info["raw_amount"])
     decimals = info.get("decimals", 6)
-    
-    balance = raw / Decimal(10 ** decimals)
-    return balance
+    return raw / Decimal(10 ** decimals)
 
-
-# =============================================================================
-# PRICE FETCHING
-# =============================================================================
 @retry()
 def get_prices(gecko_ids: list[str]) -> Dict[str, Decimal]:
-    """Fetch prices for multiple CoinGecko IDs."""
     if not gecko_ids:
         return {}
-    
     ids_str = ",".join([id_ for id_ in gecko_ids])
     url = f"{COINGECKO_BASE}/simple/price"
     params = {
@@ -188,43 +149,30 @@ def get_prices(gecko_ids: list[str]) -> Dict[str, Decimal]:
         "precision": "full",
         "include_last_updated_at": "true"
     }
-
     response = requests.get(url, params=params, timeout=12)
     response.raise_for_status()
     data = json.loads(response.text, parse_float=Decimal)
-
     prices: Dict[str, Decimal] = {}
     for gid in gecko_ids:
         prices[gid] = data.get(gid, {}).get("usd", Decimal("0"))
-
     return prices
 
-
-# =============================================================================
-# HELPER FUNCTIONS
-# =============================================================================
 def load_tokens_config() -> list[dict]:
-    """Load the dynamic tokens list from JSON (now using relative path)."""
     print(f"Looking for tokens_list.json at: {TOKENS_LIST_PATH}")
-    
     if not os.path.exists(TOKENS_LIST_PATH):
         print(f"⚠️  Tokens list not found at {TOKENS_LIST_PATH}")
-        print("   → Please create tokens_list.json in the same folder as tokens_balance.py")
-        print("   → Copy the JSON content I provided earlier.")
+        print("   → Please create tokens_list.json in the same folder as this script")
         sys.exit(1)
-    
     with open(TOKENS_LIST_PATH, 'r', encoding='utf-8') as f:
         data = json.load(f)
         print(f"Loaded {len(data)} tokens from tokens_list.json")
         return data
-
 
 def calculate_rebalance(
     token_balance: Decimal, usdc_balance: Decimal,
     token_price: Decimal, usdc_price: Decimal,
     slippage: Decimal
 ) -> Tuple[Decimal, Decimal, Decimal, Decimal]:
-    """Calculates sell amounts to reach 50/50 AFTER slippage. Generic for any token+USDC."""
     token_value = token_balance * token_price
     usdc_value = usdc_balance * usdc_price
     total_value = token_value + usdc_value
@@ -245,19 +193,13 @@ def calculate_rebalance(
         sell_token = sell_usdc = Decimal("0")
     return sell_token, sell_usdc, token_value, usdc_value
 
-
 def calculate_hypothetical_all_in_token(
     token_balance: Decimal, usdc_balance: Decimal, usdc_price: Decimal, token_price: Decimal
 ) -> Decimal:
-    """Calculate equivalent if all USDC converted to the main token."""
     usdc_value = usdc_balance * usdc_price
     additional_token = usdc_value / token_price if token_price > 0 else Decimal("0")
     return token_balance + additional_token
 
-
-# =============================================================================
-# MAIN SCRIPT
-# =============================================================================
 def main():
     print("=" * 80)
     print("    Dynamic Solana Token + USDC Portfolio Analyzer")
@@ -266,10 +208,8 @@ def main():
     print(f"    Console rounding → Balances: {CONSOLE_BALANCE_ROUNDING} decimals | USD: {CONSOLE_USD_ROUNDING} decimals")
     print("=" * 80)
 
-    # Load tokens config
     tokens_config = load_tokens_config()
 
-    # Wallet input
     if len(sys.argv) > 1:
         wallet = sys.argv[1].strip()
     else:
@@ -285,7 +225,6 @@ def main():
     
     token_accounts = get_all_token_accounts(wallet)
     
-    # Prepare candidate IDs for price fetch
     portfolio_candidates = [t for t in tokens_config if t.get("include_in_portfolio", False)]
     candidate_ids = [t["id"] for t in portfolio_candidates if t.get("mint") != "NATIVE"]
     all_ids = list(set(candidate_ids + [USDC_GECKO_ID]))
@@ -293,7 +232,6 @@ def main():
     prices_dict = get_prices(all_ids)
     usdc_price = prices_dict.get(USDC_GECKO_ID, Decimal(1))
 
-    # Select main token: first include_in_portfolio token with value > $20
     main_token_config = None
     for token in tokens_config:
         if not token.get("include_in_portfolio", False):
@@ -318,17 +256,14 @@ def main():
         print("   Exiting program (no FARTCOIN fallback as requested).")
         sys.exit(1)
 
-    # Finalize main token details (raw id only)
     main_token_id: str = main_token_config["id"]
     main_token_mint: str = main_token_config["mint"]
 
-    # Get final balances
     main_balance = get_specific_balance(token_accounts, main_token_mint, main_token_id)
     usdc_balance = get_specific_balance(token_accounts, USDC_MINT, USDC_GECKO_ID)
 
     main_price = prices_dict.get(main_token_id, Decimal(0))
 
-    # Calculations (full Decimal precision)
     sell_token, sell_usdc, token_value, usdc_value = calculate_rebalance(
         main_balance, usdc_balance, main_price, usdc_price, SLIPPAGE_ASSUMED
     )
@@ -344,13 +279,8 @@ def main():
         main_balance, usdc_balance, usdc_price, main_price
     )
 
-    # =============================================================================
-    # STARTING POINT BASELINE + DELTA CALCULATION
-    # =============================================================================
     now_kst = datetime.now(KST_TZ)
 
-    # Build row data once (reused for portfolio CSV append + starting_point creation)
-    # sell_token_to_50_50 and sell_usdc_to_50_50 removed as requested
     row = {
         "timestamp_kst": now_kst.strftime("%Y-%m-%d %H:%M:%S"),
         "wallet_address": wallet,
@@ -368,7 +298,7 @@ def main():
         "assumed_slippage": str(SLIPPAGE_ASSUMED)
     }
 
-    # Starting point CSV - one-time baseline snapshot
+    # Starting point baseline
     starting_point_filename = f"starting_point_{main_token_id}.csv"
     starting_point_path = os.path.join(CSV_OUTPUT_DIR, starting_point_filename)
     starting_equiv = hypothetical_token
@@ -390,25 +320,22 @@ def main():
         except Exception as e:
             print(f"⚠️  Could not read starting_point_{main_token_id}.csv: {e}")
     else:
-        print(f"📝 No starting_point_{main_token_id}.csv found - creating new baseline with current data...")
+        print(f"📝 No starting_point_{main_token_id}.csv found - creating new baseline...")
         try:
             with open(starting_point_path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
                 writer.writeheader()
                 writer.writerow(row)
-            print(f"✅ Created starting_point_{main_token_id}.csv baseline snapshot")
+            print(f"✅ Created starting_point_{main_token_id}.csv")
         except Exception as e:
             print(f"❌ Failed to create starting_point CSV: {e}")
 
-    # Delta calculations
     equiv_delta = hypothetical_token - starting_equiv
     usd_delta = equiv_delta * main_price if main_price > 0 else Decimal("0")
     usd_equiv_delta = total_value - starting_total_usd
-
     price_delta = main_price - starting_price
     price_pct_change = (price_delta / starting_price * Decimal("100")) if starting_price > 0 else Decimal("0")
 
-    # Summary
     print("\n" + "=" * 80)
     print(f"📊 {main_token_id} + {USDC_GECKO_ID} portfolio summary")
     print("=" * 80)
@@ -432,7 +359,6 @@ def main():
     print(f"{USDC_GECKO_ID} %                : {console_round_usd(usdc_pct):.4f}%")
     print("-" * 80)
 
-    # REBALANCE OUTPUT (still shown on console)
     slippage_pct_str = f"{SLIPPAGE_ASSUMED*100:.1f}%"
     if sell_token > 0:
         sell_value = sell_token * main_price
@@ -450,7 +376,6 @@ def main():
     if main_price == 0:
         print("⚠️  Note: Token price returned zero - calculations may be inaccurate.")
 
-    # CSV export (portfolio history - always appends)
     csv_filename = f"solana_portfolio_{main_token_id}_usdc.csv"
     csv_path = os.path.join(CSV_OUTPUT_DIR, csv_filename)
     
@@ -467,7 +392,6 @@ def main():
         print(f"❌ CSV export failed: {e}")
 
     print("\nScript completed successfully!")
-
 
 if __name__ == "__main__":
     try:
