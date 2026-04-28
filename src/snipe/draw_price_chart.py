@@ -116,7 +116,7 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
             window=SHORT_MA_WINDOW, min_periods=1).mean()
         df['long_volume_ma'] = df['total_volume'].rolling(
             window=LONG_MA_WINDOW, min_periods=1).mean()
-        print(f"✅ Calculated volume MAs (short={SHORT_MA_WINDOW}h, long={LONG_MA_WINDOW}h)")
+        print(f"Calculated volume MAs (short={SHORT_MA_WINDOW}h, long={LONG_MA_WINDOW}h)")
     else:
         df['short_volume_ma'] = None
         df['long_volume_ma'] = None
@@ -146,7 +146,7 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
     if PLOT_RECENT_MONTHS is not None and PLOT_RECENT_MONTHS > 0:
         cutoff = df['datetime_kst'].max() - pd.DateOffset(months=PLOT_RECENT_MONTHS)
         plot_df = df[df['datetime_kst'] >= cutoff].copy()
-        print(f"Plotting only the last {PLOT_RECENT_MONTHS} months of data")
+        print(f"\nPlotting the last {PLOT_RECENT_MONTHS} months of data")
 
     sns.set_style("darkgrid")
     fig, (ax1, ax2) = plt.subplots(
