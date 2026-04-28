@@ -1,7 +1,7 @@
 import requests
 import csv
 from datetime import datetime
-from decimal import Decimal, getcontext
+from decimal import Decimal, getcontext, InvalidOperation
 import sys
 import os
 import json
@@ -39,7 +39,6 @@ TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 RPC_RETRY_DELAY_SECONDS: int = 20
 RPC_DELAY_BETWEEN_CALLS_SECONDS: float = 2
 
-# Clean field list (sell_token_to_50_50 and sell_usdc_to_50_50 removed)
 CSV_FIELDNAMES: list[str] = [
     "timestamp_kst", "wallet_address", "token_id",
     "token_balance", "usdc_balance",
@@ -200,6 +199,38 @@ def calculate_hypothetical_all_in_token(
     additional_token = usdc_value / token_price if token_price > 0 else Decimal("0")
     return token_balance + additional_token
 
+# =============================================================================
+# BALANCE CHANGE DETECTION (for main portfolio CSV only)
+# =============================================================================
+def has_balance_changed(csv_path: str, current_token_balance: Decimal, current_usdc_balance: Decimal) -> bool:
+    """Return True if we should save: no file, empty file, or balances actually changed."""
+    if not os.path.exists(csv_path):
+        return True
+    
+    try:
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            if not rows:
+                return True
+            
+            last_row = rows[-1]
+            try:
+                prev_token = Decimal(last_row.get("token_balance", "0"))
+                prev_usdc = Decimal(last_row.get("usdc_balance", "0"))
+                
+                # Exact match (on-chain token amounts are precise)
+                if prev_token == current_token_balance and prev_usdc == current_usdc_balance:
+                    return False
+                return True
+            except (KeyError, ValueError, TypeError, InvalidOperation):
+                print(f"⚠️  Could not parse last CSV row balances - saving anyway")
+                return True
+    except Exception as e:
+        print(f"⚠️  Could not read CSV for balance change detection: {e}")
+        return True  # safer to save than lose data
+
+
 def main():
     print("=" * 80)
     print("    Dynamic Solana Token + USDC Portfolio Analyzer")
@@ -298,7 +329,7 @@ def main():
         "assumed_slippage": str(SLIPPAGE_ASSUMED)
     }
 
-    # Starting point baseline
+    # === STARTING POINT CSV (completely unchanged) ===
     starting_point_filename = f"starting_point_{main_token_id}.csv"
     starting_point_path = os.path.join(CSV_OUTPUT_DIR, starting_point_filename)
     starting_equiv = hypothetical_token
@@ -330,7 +361,7 @@ def main():
         except Exception as e:
             print(f"❌ Failed to create starting_point CSV: {e}")
 
-    # === UPDATED DELTA CALCULATIONS ===
+    # === DELTA CALCULATIONS (unchanged) ===
     equiv_delta = hypothetical_token - starting_equiv
     usd_delta = equiv_delta * main_price if main_price > 0 else Decimal("0")
     usd_equiv_delta = total_value - starting_total_usd
@@ -341,6 +372,7 @@ def main():
     print("\n" + "=" * 80)
     print(f"📊 {main_token_id} + {USDC_GECKO_ID} portfolio summary")
     print("=" * 80)
+    # ... (all the same console output as before) ...
     print(f"Wallet                    : {wallet}")
     print(f"Timestamp (KST)           : {now_kst.strftime('%Y-%m-%d %H:%M:%S KST')}")
     print(f"Main token                : {main_token_id}")
@@ -378,22 +410,28 @@ def main():
     if main_price == 0:
         print("⚠️  Note: Token price returned zero - calculations may be inaccurate.")
 
+    # === CSV EXPORT: ONLY WHEN BALANCE CHANGES (or first run) ===
     csv_filename = f"solana_portfolio_{main_token_id}_usdc.csv"
     csv_path = os.path.join(CSV_OUTPUT_DIR, csv_filename)
-    
-    file_exists = os.path.exists(csv_path)
-    try:
-        mode = "a" if file_exists else "w"
-        with open(csv_path, mode=mode, newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
-            if not file_exists:
-                writer.writeheader()
-            writer.writerow(row)
-        print(f"Results appended to: {csv_path}")
-    except Exception as e:
-        print(f"❌ CSV export failed: {e}")
+
+    if has_balance_changed(csv_path, main_balance, usdc_balance):
+        file_exists = os.path.exists(csv_path)
+        try:
+            mode = "a" if file_exists else "w"
+            with open(csv_path, mode=mode, newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerow(row)
+            print(f"Results appended to: {csv_path}")
+        except Exception as e:
+            print(f"❌ CSV export failed: {e}")
+    else:
+        print(f"No balance change detected in {main_token_id} or {USDC_GECKO_ID}. "
+              f"Latest data shown in console but NOT saved to CSV.")
 
     print("\nScript completed successfully!")
+
 
 if __name__ == "__main__":
     try:
