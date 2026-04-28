@@ -167,7 +167,7 @@ def fetch_price_history_for_token(token: Dict, api_key: str) -> pd.DataFrame:
 
     print(f"🎉 SUCCESS! Saved {len(df):,} hourly records → {output_file.name}")
     print(f"   Date range: {df['datetime'].min().date()} → {df['datetime'].max().date()}")
-    print(f"   File size: {output_file.stat().st_size / 1024:.1f} KB\n")
+    print(f"   File size: {output_file.stat().st_size / 1024:.1f} KB")
 
     return df
 
