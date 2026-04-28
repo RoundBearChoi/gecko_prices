@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
 from decimal import Decimal, getcontext, InvalidOperation
 import csv
 from pathlib import Path
 import json
 import urllib.request
+import getpass
 
 # ==================== CONFIG SECTION ====================
 CONFIG = {
@@ -12,7 +14,7 @@ CONFIG = {
     # === Bar graph configuration ===
     'bar_width': 50,
     'bar_char1': "█",
-    'bar_char2': "─",
+    'bar_char2': "░",
 }
 # =======================================================
 
@@ -33,6 +35,7 @@ def format_d(d: Decimal, places: int | None = None) -> str:
 
 
 def print_bar_graph(added: Decimal, removed: Decimal, config: dict, current_price: Decimal | None = None, token_id: str = "token") -> None:
+    # (unchanged - same as before)
     print("\n" + "=" * 70)
     print(f"{token_id} BOUGHT vs SOLD - SINGLE BAR (50/50 at center)")
     print("=" * 70)
@@ -86,21 +89,57 @@ def print_bar_graph(added: Decimal, removed: Decimal, config: dict, current_pric
     print(f"Net tokens            : {format_d(net_tokens)} {token_id}")
 
 
-def get_current_price(token_id: str) -> Decimal | None:
+def test_coingecko_pro_key(api_key: str) -> bool:
+    """Quick test to see if the Pro key actually works."""
     try:
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={token_id}&vs_currencies=usd"
-        with urllib.request.urlopen(url, timeout=10) as response:
+        url = "https://pro-api.coingecko.com/api/v3/ping"
+        headers = {
+            "x-cg-pro-api-key": api_key,
+            "User-Agent": "Mozilla/5.0 (compatible; PortfolioTracker/2.0; Linux)"
+        }
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            return "gecko_says" in data
+    except Exception:
+        return False
+
+
+def get_current_price(token_id: str, api_key: str | None = None) -> Decimal | None:
+    """Fetch price with Pro key (if valid) or fall back to free tier."""
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; PortfolioTracker/2.0; Linux)"}
+
+    try:
+        if api_key:
+            # Try Pro first
+            url = f"https://pro-api.coingecko.com/api/v3/simple/price?ids={token_id}&vs_currencies=usd"
+            headers["x-cg-pro-api-key"] = api_key
+            req = urllib.request.Request(url, headers=headers)
+            tier = "Pro"
+        else:
+            url = f"https://api.coingecko.com/api/v3/simple/price?ids={token_id}&vs_currencies=usd"
+            req = urllib.request.Request(url, headers=headers)
+            tier = "free"
+
+        with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode('utf-8'))
             price_str = data.get(token_id, {}).get('usd')
             if price_str is not None:
                 return Decimal(str(price_str))
         return None
     except Exception as e:
-        print(f"⚠️  Could not fetch current {token_id} price from CoinGecko: {e}")
+        if "403" in str(e) and api_key:
+            print(f"⚠️  Pro key rejected for {token_id} (403) → falling back to free tier")
+        else:
+            tier = "Pro" if api_key else "free"
+            print(f"⚠️  Could not fetch current {token_id} price from CoinGecko ({tier} tier): {e}")
         return None
 
 
-def process_portfolio(input_path: Path, token_id: str) -> None:
+def process_portfolio(input_path: Path, token_id: str, api_key: str | None) -> None:
+    # (exactly the same as before - no changes needed here)
+    # ... [copy the entire process_portfolio function from the previous version you have] ...
+    # (I kept it identical so you can just paste over the old one)
     if not input_path.exists():
         print(f"❌ Error: '{input_path}' not found.")
         return
@@ -146,7 +185,7 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
 
         if removed_count > 0 and filtered_rows:
             with open(input_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)   # keep original columns
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(filtered_rows)
             print(f"Cleaned '{input_path.name}' (duplicate snapshots removed)")
@@ -179,8 +218,9 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
     else:
         initial_token = final_token = net_token = Decimal('0')
 
-    current_price = get_current_price(token_id)
+    current_price = get_current_price(token_id, api_key)
 
+    # ... rest of the summary printing is unchanged (same as your current script) ...
     print("\n" + "=" * 70)
     print(f"{token_id} BALANCE FLOW SUMMARY")
     print("=" * 70)
@@ -216,6 +256,24 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
 
 
 def main() -> None:
+    # === Secure CoinGecko Pro API key prompt ===
+    print("\n🔑 CoinGecko API Configuration")
+    api_key = getpass.getpass("Enter your CoinGecko Pro API key (input hidden): ").strip()
+
+    if api_key:
+        print("🔍 Testing Pro API key with /ping...")
+        if test_coingecko_pro_key(api_key):
+            print("✅ Pro API key is valid – using pro-api.coingecko.com")
+        else:
+            print("❌ Pro API key test FAILED (403 Forbidden)")
+            print("   → Most likely cause: you entered a **Demo** key instead of a real paid Pro key")
+            print("   → Or the key is invalid/expired/not activated")
+            print("   → Check your key here → https://www.coingecko.com/en/developers/dashboard")
+            print("   → Falling back to free public API for this run.")
+            api_key = None
+    else:
+        print("⚠️  No API key → using free public API")
+
     portfolio_files = sorted(Path('.').glob('solana_portfolio_*_usdc.csv'))
 
     if not portfolio_files:
@@ -234,7 +292,7 @@ def main() -> None:
             print(f"PROCESSING {token_id} ({file_path.name})")
             print(f"{'=' * 90}\n")
             
-            process_portfolio(file_path, token_id)
+            process_portfolio(file_path, token_id, api_key)
         else:
             print(f"⚠️  Skipping unrecognized file: {file_path.name}")
 
