@@ -168,7 +168,7 @@ def get_specific_balance(token_accounts: dict, mint: str, token_id: str) -> Deci
     decimals = info.get("decimals", 6)
     
     balance = raw / Decimal(10 ** decimals)
-    print(f"Found {token_id} balance: {console_round_balance(balance)} (decimals={decimals} from on-chain data)")
+    #print(f"Found {token_id} balance: {console_round_balance(balance)} (decimals={decimals} from on-chain data)")
     return balance
 
 
@@ -198,13 +198,13 @@ def get_prices(gecko_ids: list[str]) -> Dict[str, Decimal]:
     for gid in gecko_ids:
         prices[gid] = data.get(gid, {}).get("usd", Decimal("0"))
 
-    print("\n✅ CoinGecko prices (full precision):")
-    for gid, price in prices.items():
-        print(f"   {gid}: ${console_round_usd(price)}")
+    #print("\n✅ CoinGecko prices (full precision):")
+    #for gid, price in prices.items():
+    #    print(f"   {gid}: ${console_round_usd(price)}")
     
     if gecko_ids and data.get(gecko_ids[0], {}).get("last_updated_at"):
         ts = datetime.fromtimestamp(data[gecko_ids[0]]['last_updated_at'], tz=KST_TZ)
-        print(f"\n   Last updated: {ts.strftime('%Y-%m-%d %H:%M:%S KST')}")
+        #print(f"\n   Last updated: {ts.strftime('%Y-%m-%d %H:%M:%S KST')}")
     
     return prices
 
@@ -303,7 +303,6 @@ def main():
     usdc_price = prices_dict.get(USDC_GECKO_ID, Decimal(1))
 
     # Select main token: first include_in_portfolio token with value > $20
-    # (No fallback to FARTCOIN anymore — exit instead)
     main_token_config = None
     for token in tokens_config:
         if not token.get("include_in_portfolio", False):
@@ -333,14 +332,14 @@ def main():
     main_token_mint: str = main_token_config["mint"]
 
     # Get final balances with display (raw id only)
-    print("\n" + "-" * 80)
+    #print("\n" + "-" * 80)
     main_balance = get_specific_balance(token_accounts, main_token_mint, main_token_id)
     usdc_balance = get_specific_balance(token_accounts, USDC_MINT, USDC_GECKO_ID)
 
     main_price = prices_dict.get(main_token_id, Decimal(0))
 
-    print(f"{main_token_id} liquid balance: {console_round_balance(main_balance)}")
-    print(f"{USDC_GECKO_ID} liquid balance: {console_round_balance(usdc_balance)}")
+    #print(f"{main_token_id} liquid balance: {console_round_balance(main_balance)}")
+    #print(f"{USDC_GECKO_ID} liquid balance: {console_round_balance(usdc_balance)}")
 
     # Calculations (full Decimal precision)
     sell_token, sell_usdc, token_value, usdc_value = calculate_rebalance(
@@ -359,9 +358,8 @@ def main():
     )
 
     # =============================================================================
-    # STARTING POINT BASELINE + DELTA CALCULATION (NEW FEATURE)
+    # STARTING POINT BASELINE + DELTA CALCULATION (NEW FEATURE + PRICE DELTA)
     # =============================================================================
-    # now_kst and row are built here so they are available for starting_point CSV
     now_kst = datetime.now(KST_TZ)
 
     # Build row data once (reused for portfolio CSV append + starting_point creation)
@@ -388,7 +386,8 @@ def main():
     starting_point_filename = f"starting_point_{main_token_id}.csv"
     starting_point_path = os.path.join(CSV_OUTPUT_DIR, starting_point_filename)
     starting_equiv = hypothetical_token
-    starting_total_usd = total_value   # default to current (delta = 0 on first run)
+    starting_total_usd = total_value
+    starting_price = main_price   # ← NEW: default to current price
 
     if os.path.exists(starting_point_path):
         try:
@@ -398,10 +397,13 @@ def main():
                 if rows:
                     if "hypothetical_token_equivalent" in rows[0]:
                         starting_equiv = Decimal(rows[0]["hypothetical_token_equivalent"])
-                        print(f"\nLoaded starting {main_token_id} equivalent baseline: {console_round_balance(starting_equiv)}")
+                        #print(f"\nLoaded starting {main_token_id} equivalent baseline: {console_round_balance(starting_equiv)}")
                     if "total_value_usd" in rows[0]:
                         starting_total_usd = Decimal(rows[0]["total_value_usd"])
-                        print(f"Loaded starting USD equivalent baseline: ${console_round_usd(starting_total_usd):,.{CONSOLE_USD_ROUNDING}f}")
+                        #print(f"Loaded starting USD equivalent baseline: ${console_round_usd(starting_total_usd):,.{CONSOLE_USD_ROUNDING}f}")
+                    if "token_price_usd" in rows[0]:                                   # ← NEW
+                        starting_price = Decimal(rows[0]["token_price_usd"])
+                        #print(f"Loaded starting {main_token_id} price baseline: ${console_round_usd(starting_price)}")
         except Exception as e:
             print(f"⚠️  Could not read starting_point_{main_token_id}.csv: {e}")
     else:
@@ -415,10 +417,14 @@ def main():
         except Exception as e:
             print(f"❌ Failed to create starting_point CSV: {e}")
 
-    # Delta calculation
+    # Delta calculations
     equiv_delta = hypothetical_token - starting_equiv
-    usd_delta = equiv_delta * main_price if main_price > 0 else Decimal("0")          # existing (token equiv → USD)
-    usd_equiv_delta = total_value - starting_total_usd                                 # NEW: actual portfolio USD delta
+    usd_delta = equiv_delta * main_price if main_price > 0 else Decimal("0")
+    usd_equiv_delta = total_value - starting_total_usd
+
+    # NEW: Price delta (current vs starting price from CSV)
+    price_delta = main_price - starting_price
+    price_pct_change = (price_delta / starting_price * Decimal("100")) if starting_price > 0 else Decimal("0")
 
     # Summary (pure raw ids only)
     print("\n" + "=" * 80)
@@ -434,11 +440,18 @@ def main():
     print(f"token equiv delta         : {console_round_balance(equiv_delta)} {main_token_id} (${console_round_usd(usd_delta):+,.{CONSOLE_USD_ROUNDING}f})")
     print(f"USD equivalent            : ${console_round_usd(total_value):,.{CONSOLE_USD_ROUNDING}f} USD")
     print(f"USD equivalent delta      : ${console_round_usd(usd_equiv_delta):+,.{CONSOLE_USD_ROUNDING}f} USD")
+    
+    # NEW PRICE DELTA SECTION
+    print("-" * 80)
+    print(f"Starting price            : ${console_round_usd(starting_price)}")
+    print(f"Current price             : ${console_round_usd(main_price)}")
+    print(f"Price change              : ${console_round_usd(price_delta):+,.{CONSOLE_USD_ROUNDING}f} ({price_pct_change:+.4f}%)")
+
     print(f"token %                   : {console_round_usd(token_pct):.4f}%")
     print(f"{USDC_GECKO_ID} %                : {console_round_usd(usdc_pct):.4f}%")
     print("-" * 80)
 
-    # REBALANCE OUTPUT (raw ids only) — NOW INCLUDES USD SELL VALUE
+    # REBALANCE OUTPUT (unchanged)
     slippage_pct_str = f"{SLIPPAGE_ASSUMED*100:.1f}%"
     if sell_token > 0:
         sell_value = sell_token * main_price
