@@ -228,7 +228,7 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
 
     # Save chart
     plt.savefig(OUTPUT_FILE, dpi=DPI, bbox_inches='tight')
-    print(f"Chart saved as '{OUTPUT_FILE}' (DPI = {DPI})")
+    print(f"\nChart saved as '{OUTPUT_FILE}' (DPI = {DPI})")
     plt.close()
 
 
@@ -250,5 +250,3 @@ if __name__ == "__main__":
         else:
             coin_id = args.coin or 'fartcoin'
             generate_price_chart(coin_id)
-
-    print("\n🎉 All done!")
