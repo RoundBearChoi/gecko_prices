@@ -9,8 +9,7 @@ import json
 # ==================== CONFIG SECTION ====================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Portfolio & chart display settings (easy to tweak here)
-PLOT_RECENT_MONTHS = 6          # ← Change this! Set to None or 0 for full history
+PLOT_RECENT_MONTHS = 12
 RECENT_DAYS_FOR_SUMMARY = 30
 DPI = 150
 FIG_SIZE = (15, 8)
