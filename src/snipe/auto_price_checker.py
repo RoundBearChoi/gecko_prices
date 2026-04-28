@@ -10,11 +10,10 @@ from datetime import datetime
 from decimal import Decimal, getcontext
 
 # ==================== CONFIG SECTION ====================
-# Change these variables to customize behavior
-UPDATE_INTERVAL_MINUTES = 4          # How often to fetch fresh prices from CoinGecko
-BAR_WIDTH = 50                       # Width of the progress bar (characters)
+UPDATE_INTERVAL_MINUTES = 4
+BAR_WIDTH = 50
 CLEAR_SCREEN_ON_UPDATE = True        # Linux-optimized: clears terminal for a clean dashboard each cycle
-USE_COLORS = True                    # Enable ANSI colors (perfect for Linux terminals)
+USE_COLORS = True                    # Enable ANSI colors (for Linux terminals)
 
 # Sound alert configuration
 PRICE_CHANGE_THRESHOLD_PERCENT = 2.5  # Play sound if any token's price changes by more than this % (absolute)
@@ -146,7 +145,7 @@ def print_status(last_prices, current_prices, token_ids, timestamp, api_key_used
     
     print("\n" + "=" * 100)
     pro_status = f" {COLORS['blue']}🟣 Pro API{COLORS['reset']}" if api_key_used else " (free tier)"
-    print(f"🚀 Solana Portfolio Price Monitor — {timestamp} KST{pro_status}")
+    print(f"Solana Portfolio Price Monitor — {timestamp} KST{pro_status}")
     print("=" * 100)
     print(f"{'Token ID':<25} {'Last Recorded (USD)':<20} {'Current Price (USD)':<20} {'Δ %':<15}")
     print("-" * 100)
@@ -183,7 +182,7 @@ def print_status(last_prices, current_prices, token_ids, timestamp, api_key_used
     
     print("=" * 100)
     count = len(token_ids)
-    print(f"📊 Monitoring {count} token{'s' if count != 1 else ''} • Sound alert >{PRICE_CHANGE_THRESHOLD_PERCENT}% • Next update in {UPDATE_INTERVAL_MINUTES} minutes")
+    print(f"Monitoring {count} token{'s' if count != 1 else ''} • Sound alert >{PRICE_CHANGE_THRESHOLD_PERCENT}% • Next update in {UPDATE_INTERVAL_MINUTES} minutes")
     
     # Play sound alert + show which token(s) triggered it
     if triggered_moves:
@@ -197,7 +196,7 @@ def countdown_timer(seconds):
         filled = int(BAR_WIDTH * progress)
         bar = '█' * filled + '░' * (BAR_WIDTH - filled)
         
-        timer_line = f"\r⏳ Next update in {mins:02d}:{secs:02d} [{bar}] {progress*100:3.0f}%"
+        timer_line = f"\rNext update in {mins:02d}:{secs:02d} [{bar}] {progress*100:3.0f}%"
         sys.stdout.write(timer_line)
         sys.stdout.flush()
         time.sleep(1)
@@ -208,7 +207,7 @@ def countdown_timer(seconds):
 
 def main():
     """Main monitoring loop."""
-    print(f"{COLORS['bold']}🚀 Starting Solana Portfolio Monitor (Linux Optimized){COLORS['reset']}")
+    print(f"{COLORS['bold']}Starting Solana Portfolio Monitor (Linux Optimized){COLORS['reset']}")
     print(f"   • Looking for files: solana_portfolio_*_usdc.csv")
     print(f"   • Update frequency: every {UPDATE_INTERVAL_MINUTES} minutes")
     print(f"   • Token IDs kept exactly as in filename")
@@ -227,7 +226,7 @@ def main():
                 print("   ⚠️  No key entered → using free tier")
                 api_key = None
         except (EOFError, KeyboardInterrupt):
-            print("\n👋 Exiting...")
+            print("\nExiting...")
             sys.exit(0)
     
     api_key_used = bool(api_key)
@@ -266,7 +265,7 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print(f"\n\n{COLORS['yellow']}👋 Monitor stopped by user. Goodbye!{COLORS['reset']}")
+        print(f"\n\n{COLORS['yellow']}Monitor stopped by user. Goodbye!{COLORS['reset']}")
     except Exception as e:
         print(f"\n💥 Unexpected error: {e}")
         print("Tip: pip install requests if missing")
