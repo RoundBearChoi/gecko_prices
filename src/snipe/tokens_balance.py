@@ -330,9 +330,11 @@ def main():
         except Exception as e:
             print(f"❌ Failed to create starting_point CSV: {e}")
 
+    # === UPDATED DELTA CALCULATIONS ===
     equiv_delta = hypothetical_token - starting_equiv
     usd_delta = equiv_delta * main_price if main_price > 0 else Decimal("0")
     usd_equiv_delta = total_value - starting_total_usd
+    usd_equiv_pct_change = (usd_equiv_delta / starting_total_usd * Decimal("100")) if starting_total_usd > 0 else Decimal("0")
     price_delta = main_price - starting_price
     price_pct_change = (price_delta / starting_price * Decimal("100")) if starting_price > 0 else Decimal("0")
 
@@ -348,7 +350,7 @@ def main():
     print(f"token equivalent          : {console_round_balance(hypothetical_token)} {main_token_id}")
     print(f"token equiv delta         : {console_round_balance(equiv_delta)} {main_token_id} (${console_round_usd(usd_delta):+,.{CONSOLE_USD_ROUNDING}f})")
     print(f"USD equivalent            : ${console_round_usd(total_value):,.{CONSOLE_USD_ROUNDING}f} USD")
-    print(f"USD equivalent delta      : ${console_round_usd(usd_equiv_delta):+,.{CONSOLE_USD_ROUNDING}f} USD")
+    print(f"USD equivalent delta      : ${console_round_usd(usd_equiv_delta):+,.{CONSOLE_USD_ROUNDING}f} USD ({usd_equiv_pct_change:+.4f}%)")
     
     print("-" * 80)
     print(f"Starting price            : ${console_round_usd(starting_price)}")
