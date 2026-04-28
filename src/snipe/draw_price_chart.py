@@ -85,7 +85,7 @@ def load_token_config(coin_id: str):
                     "short_term_hours": token.get("short_term_hours", 168),
                     "long_term_hours": token.get("long_term_hours", 720)
                 }
-                print(f"✅ Loaded token-specific config for {coin_id}: "
+                print(f"Loaded token-specific config for {coin_id}: "
                       f"short={config['short_term_hours']}h, long={config['long_term_hours']}h")
                 return config
     except Exception as e:
@@ -105,11 +105,11 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
         return
 
     print(f"\n{'='*70}")
-    print(f"📊 PROCESSING: {coin_id.upper()}")
+    print(f"PROCESSING: {coin_id.upper()}")
     print(f"{'='*70}")
 
     # Load data
-    print(f"📂 Loading data from: {csv_path}")
+    print(f"Loading data from: {csv_path}")
     df = pd.read_csv(csv_path)
 
     # CRITICAL FIX: Convert string prices (full Decimal precision)
@@ -149,10 +149,10 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
     latest_long_ma = recent_df['long_ma'].iloc[-1]
     latest_time_kst = recent_df['datetime_kst'].iloc[-1]
 
-    print(f"\n📅 Latest data point (KST): {latest_time_kst.strftime('%Y-%m-%d %H:%M')}")
-    print(f"💰 Latest {coin_id} Price: ${latest_price:.6f}")
+    print(f"\nLatest data point (KST): {latest_time_kst.strftime('%Y-%m-%d %H:%M')}")
+    print(f"Latest {coin_id} Price: ${latest_price:.6f}")
 
-    print(f"\n📈 Moving Averages:")
+    print(f"\nMoving Averages:")
     print(f"  Short MA ({SHORT_MA_WINDOW}h): ${latest_short_ma:.6f}  [{(latest_price / latest_short_ma - 1)*100:+.2f}%]")
     print(f"  Long MA ({LONG_MA_WINDOW}h):  ${latest_long_ma:.6f}  [{(latest_price / latest_long_ma - 1)*100:+.2f}%]")
 
@@ -164,7 +164,7 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
 
     price_s = recent_df['price_usd']
 
-    print("\n📊 Recent Performance:")
+    print("\nRecent Performance:")
     print(f"  24h change: {pct_change(price_s, 24):+6.2f}%")
     print(f"   3d change: {pct_change(price_s, 72):+6.2f}%")
     print(f"   7d change: {pct_change(price_s, 168):+6.2f}%")
@@ -173,12 +173,12 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
     # Range info
     recent_high = recent_df['price_usd'].max()
     recent_low = recent_df['price_usd'].min()
-    print(f"\n📍 {RECENT_DAYS_FOR_SUMMARY}d Range: ${recent_low:.4f} – ${recent_high:.4f}")
+    print(f"\n{RECENT_DAYS_FOR_SUMMARY}d Range: ${recent_low:.4f} – ${recent_high:.4f}")
     if latest_price > 0:
         print(f"   Current from {RECENT_DAYS_FOR_SUMMARY}d high: {(latest_price / recent_high - 1)*100 :+.1f}%")
 
     # Short MA momentum
-    print("\n🔄 Short MA Momentum:")
+    print("\nShort MA Momentum:")
     for hours in SHORT_MA_MOMENTUM_WINDOWS:
         if len(recent_df) > hours:
             mom = (latest_short_ma / recent_df['short_ma'].iloc[-hours] - 1) * 100
@@ -191,7 +191,7 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
     if PLOT_RECENT_MONTHS is not None and PLOT_RECENT_MONTHS > 0:
         cutoff = df['datetime_kst'].max() - pd.DateOffset(months=PLOT_RECENT_MONTHS)
         plot_df = df[df['datetime_kst'] >= cutoff].copy()
-        print(f"📉 Plotting only the last {PLOT_RECENT_MONTHS} months of data")
+        print(f"Plotting only the last {PLOT_RECENT_MONTHS} months of data")
 
     sns.set_style("darkgrid")
     plt.figure(figsize=FIG_SIZE)
@@ -228,7 +228,7 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
 
     # Save chart
     plt.savefig(OUTPUT_FILE, dpi=DPI, bbox_inches='tight')
-    print(f"✅ Chart saved as '{OUTPUT_FILE}' (DPI = {DPI})")
+    print(f"Chart saved as '{OUTPUT_FILE}' (DPI = {DPI})")
     plt.close()
 
 
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     if args.portfolio or (args.coin is None and args.csv is None):
         # PORTFOLIO MODE (default)
         portfolio = get_portfolio_tokens()
-        print(f"🚀 Generating charts for {len(portfolio)} portfolio token(s)...")
+        print(f"Generating charts for {len(portfolio)} portfolio token(s)...")
         for token in portfolio:
             coin_id = token.get("id")
             if coin_id:

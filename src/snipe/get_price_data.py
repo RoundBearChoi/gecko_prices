@@ -52,7 +52,7 @@ def load_tokens(json_path: str) -> List[Dict]:
     with open(path, encoding="utf-8") as f:
         tokens = json.load(f)
     portfolio_tokens = [t for t in tokens if t.get("include_in_portfolio", False)]
-    print(f"✅ Loaded {len(portfolio_tokens)} portfolio tokens from {path}")
+    print(f"Loaded {len(portfolio_tokens)} portfolio tokens from {path}")
     return portfolio_tokens
 
 
@@ -99,7 +99,7 @@ def fetch_price_history_for_token(token: Dict, api_key: str) -> pd.DataFrame:
         print(f"✅ {output_file.name} already exists (set FORCE_FRESH_DOWNLOAD=True to override)")
         return pd.read_csv(output_file, parse_dates=["datetime"])
 
-    print(f"\n📡 Fetching ≈{CONFIG['MONTHS_BACK']} months of **hourly** data for {coin_id}")
+    print(f"\nFetching ≈{CONFIG['MONTHS_BACK']} months of **hourly** data for {coin_id}")
     print(f"   Using precision={CONFIG['PRECISION']} + Decimal parsing")
 
     end_date = datetime.now(timezone.utc)
@@ -174,7 +174,7 @@ def fetch_price_history_for_token(token: Dict, api_key: str) -> pd.DataFrame:
 
 def main():
     print("=" * 70)
-    print("🚀 CoinGecko Pro Hourly Price Fetcher (MAX PRECISION: Decimal + precision=full)")
+    print("CoinGecko Pro Hourly Price Fetcher (MAX PRECISION: Decimal + precision=full)")
     print("=" * 70)
 
     api_key = get_api_key()
@@ -202,10 +202,9 @@ def main():
             print(f"❌ Error processing {coin_id}: {e}")
 
     print("=" * 70)
-    print(f"🎉 FINISHED! {success}/{len(tokens)} tokens saved successfully.")
-    print(f"📁 Check the '{CONFIG['OUTPUT_DIR']}' folder for your CSVs.")
+    print(f"FINISHED! {success}/{len(tokens)} tokens saved successfully.")
+    print(f"Check the '{CONFIG['OUTPUT_DIR']}' folder for your CSVs.")
     print(f"Current time (UTC): {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
-    print("\n💡 Tip: Prices are now stored with absolute maximum precision (no float rounding).")
 
 
 if __name__ == "__main__":
