@@ -168,7 +168,7 @@ def get_specific_balance(token_accounts: dict, mint: str, token_id: str) -> Deci
     decimals = info.get("decimals", 6)
     
     balance = raw / Decimal(10 ** decimals)
-    print(f"    Found {token_id} balance: {console_round_balance(balance)} (decimals={decimals} from on-chain data)")
+    print(f"Found {token_id} balance: {console_round_balance(balance)} (decimals={decimals} from on-chain data)")
     return balance
 
 
@@ -204,7 +204,7 @@ def get_prices(gecko_ids: list[str]) -> Dict[str, Decimal]:
     
     if gecko_ids and data.get(gecko_ids[0], {}).get("last_updated_at"):
         ts = datetime.fromtimestamp(data[gecko_ids[0]]['last_updated_at'], tz=KST_TZ)
-        print(f"   Last updated: {ts.strftime('%Y-%m-%d %H:%M:%S KST')}")
+        print(f"\n   Last updated: {ts.strftime('%Y-%m-%d %H:%M:%S KST')}")
     
     return prices
 
@@ -214,7 +214,7 @@ def get_prices(gecko_ids: list[str]) -> Dict[str, Decimal]:
 # =============================================================================
 def load_tokens_config() -> list[dict]:
     """Load the dynamic tokens list from JSON (now using relative path)."""
-    print(f"🔍 Looking for tokens_list.json at: {TOKENS_LIST_PATH}")
+    print(f"Looking for tokens_list.json at: {TOKENS_LIST_PATH}")
     
     if not os.path.exists(TOKENS_LIST_PATH):
         print(f"⚠️  Tokens list not found at {TOKENS_LIST_PATH}")
@@ -224,7 +224,7 @@ def load_tokens_config() -> list[dict]:
     
     with open(TOKENS_LIST_PATH, 'r', encoding='utf-8') as f:
         data = json.load(f)
-        print(f"✅ Loaded {len(data)} tokens from tokens_list.json")
+        print(f"Loaded {len(data)} tokens from tokens_list.json")
         return data
 
 
@@ -269,7 +269,7 @@ def calculate_hypothetical_all_in_token(
 # =============================================================================
 def main():
     print("=" * 80)
-    print("🚀 Dynamic Solana Token + USDC Portfolio Analyzer")
+    print("    Dynamic Solana Token + USDC Portfolio Analyzer")
     print(f"    Dual Token/Token-2022 • Slippage-aware 50/50 rebalance")
     print(f"    Using {SLIPPAGE_ASSUMED*100:.1f}% assumed slippage")
     print(f"    Console rounding → Balances: {CONSOLE_BALANCE_ROUNDING} decimals | USD: {CONSOLE_USD_ROUNDING} decimals")
@@ -316,11 +316,11 @@ def main():
         price = prices_dict.get(token_id, Decimal(0))
         value_usd = balance * price
         
-        print(f"   📋 Checked {token_id}: {console_round_balance(balance)} @ ${console_round_usd(price)} = ${console_round_usd(value_usd)}")
+        print(f"   Checked {token_id}: {console_round_balance(balance)} @ ${console_round_usd(price)} = ${console_round_usd(value_usd)}")
         
         if value_usd > Decimal("20"):
             main_token_config = token
-            print(f"✅ Selected {token_id} as main token (>$20 USD value)")
+            print(f"\n   Selected {token_id} as main token (>$20 USD value)")
             break
 
     if main_token_config is None:
@@ -333,14 +333,14 @@ def main():
     main_token_mint: str = main_token_config["mint"]
 
     # Get final balances with display (raw id only)
-    print("\n" + "-" * 40)
+    print("\n" + "-" * 80)
     main_balance = get_specific_balance(token_accounts, main_token_mint, main_token_id)
     usdc_balance = get_specific_balance(token_accounts, USDC_MINT, USDC_GECKO_ID)
 
     main_price = prices_dict.get(main_token_id, Decimal(0))
 
-    print(f"   {main_token_id} liquid balance: {console_round_balance(main_balance)}")
-    print(f"   {USDC_GECKO_ID} liquid balance: {console_round_balance(usdc_balance)}")
+    print(f"{main_token_id} liquid balance: {console_round_balance(main_balance)}")
+    print(f"{USDC_GECKO_ID} liquid balance: {console_round_balance(usdc_balance)}")
 
     # Calculations (full Decimal precision)
     sell_token, sell_usdc, token_value, usdc_value = calculate_rebalance(
@@ -398,10 +398,10 @@ def main():
                 if rows:
                     if "hypothetical_token_equivalent" in rows[0]:
                         starting_equiv = Decimal(rows[0]["hypothetical_token_equivalent"])
-                        print(f"✅ Loaded starting {main_token_id} equivalent baseline: {console_round_balance(starting_equiv)}")
+                        print(f"\nLoaded starting {main_token_id} equivalent baseline: {console_round_balance(starting_equiv)}")
                     if "total_value_usd" in rows[0]:
                         starting_total_usd = Decimal(rows[0]["total_value_usd"])
-                        print(f"✅ Loaded starting USD equivalent baseline: ${console_round_usd(starting_total_usd):,.{CONSOLE_USD_ROUNDING}f}")
+                        print(f"Loaded starting USD equivalent baseline: ${console_round_usd(starting_total_usd):,.{CONSOLE_USD_ROUNDING}f}")
         except Exception as e:
             print(f"⚠️  Could not read starting_point_{main_token_id}.csv: {e}")
     else:
@@ -451,7 +451,7 @@ def main():
     else:
         print("✅ Portfolio is already perfectly balanced at 50/50!")
 
-    print("=" * 80)
+    print("-" * 80)
 
     if main_price == 0:
         print("⚠️  Note: Token price returned zero - calculations may be inaccurate.")
