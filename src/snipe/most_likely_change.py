@@ -14,7 +14,7 @@ import pytz
 
 # ====================== CONFIG SECTION ======================
 CONFIG = {
-    "months_back": 8,
+    "months_back": 12,
     "bootstrap_samples": 5000,         # Number of bootstrap resamples
     "kst_target_hour": 14,             # 2 PM KST (day end)
     "data_dir": "price_data",          # Folder containing fartcoin.csv and popcat.csv
