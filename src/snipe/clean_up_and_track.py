@@ -130,15 +130,15 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
 
     # === EXPLICIT EDGE-CASE HANDLING ===
     if not original_rows:
-        print(f"✅ '{input_path.name}' contains only a header (0 data rows).")
+        print(f"'{input_path.name}' contains only a header (0 data rows).")
         print("   → No cleaning needed - file left completely unchanged.")
         filtered_rows = []
     elif len(original_rows) <= 1:
-        print(f"✅ Loaded {len(original_rows):,} data row(s) from {input_path.name}")
+        print(f"Loaded {len(original_rows):,} data row(s) from {input_path.name}")
         print(f"   → Only {len(original_rows)} row(s) detected. No cleaning needed - file left completely unchanged.")
         filtered_rows = original_rows
     else:
-        print(f"✅ Loaded {len(original_rows):,} total snapshot rows from {input_path.name}")
+        print(f"Loaded {len(original_rows):,} total snapshot rows from {input_path.name}")
 
         # Step 2: Filter unchanged rows
         filtered_rows = []
@@ -161,7 +161,7 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
                 prev_usdc_bal = curr_usdc
 
         removed_count = len(original_rows) - len(filtered_rows)
-        print(f"✅ Filtered down to {len(filtered_rows):,} meaningful rows "
+        print(f"Filtered down to {len(filtered_rows):,} meaningful rows "
               f"(removed {removed_count:,} rows with no balance change)")
 
         # Step 3: OVERWRITE only if we actually removed rows
@@ -170,10 +170,10 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(filtered_rows)
-            print(f"✅ Original file '{input_path.name}' has been overwritten with the cleaned version")
+            print(f"Original file '{input_path.name}' has been overwritten with the cleaned version")
             print("   → Only rows where token or USDC balance actually changed are kept")
         else:
-            print(f"✅ No changes needed – '{input_path.name}' already contains only meaningful rows")
+            print(f"No changes needed – '{input_path.name}' already contains only meaningful rows")
             filtered_rows = original_rows
 
     # Step 4: Track added vs removed
@@ -261,7 +261,7 @@ def main() -> None:
         if len(parts) >= 4 and parts[0] == 'solana' and parts[1] == 'portfolio' and parts[-1] == 'usdc':
             token_id = '_'.join(parts[2:-1])
             print(f"\n{'=' * 90}")
-            print(f"🚀 PROCESSING {token_id} ({file_path.name})")
+            print(f"PROCESSING {token_id} ({file_path.name})")
             print(f"{'=' * 90}\n")
             
             process_portfolio(file_path, token_id)
