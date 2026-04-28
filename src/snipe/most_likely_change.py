@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Cryptocurrency 24h Price Change Analysis Script (pandas 3.x fixed)
+Dynamic portfolio loading from tokens_list.json
 """
 
 import pandas as pd
@@ -11,14 +12,14 @@ from pathlib import Path
 from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
 import pytz
+import json
 
 # ====================== CONFIG SECTION ======================
 CONFIG = {
     "months_back": 12,
     "bootstrap_samples": 5000,         # Number of bootstrap resamples
     "kst_target_hour": 14,             # 2 PM KST (day end)
-    "data_dir": "price_data",          # Folder containing fartcoin.csv and popcat.csv
-    "coins": ["fartcoin", "popcat"],   # Filenames without .csv
+    "data_dir": "price_data",          # Folder containing the CSV files
     "histogram_bin_width": 1.0,        # For histogram mode
     "random_seed": 42,
     "save_plots": True,                # Change to False if you don't want PNGs
@@ -29,13 +30,46 @@ CONFIG = {
 np.random.seed(CONFIG["random_seed"])
 
 
+def load_portfolio_tokens() -> list[str]:
+    """Load token IDs from tokens_list.json that are flagged for portfolio inclusion."""
+    # Try current working directory first, then script directory
+    json_paths = [
+        Path("tokens_list.json"),
+        Path(__file__).parent / "tokens_list.json",
+    ]
+    
+    json_path = None
+    for path in json_paths:
+        if path.exists():
+            json_path = path
+            break
+    
+    if not json_path:
+        raise FileNotFoundError(f"❌ tokens_list.json not found. Looked in cwd and script directory.")
+
+    print(f"📋 Loading portfolio tokens from {json_path}...")
+    with open(json_path, 'r', encoding='utf-8') as f:
+        tokens = json.load(f)
+    
+    portfolio_ids = [
+        token["id"] for token in tokens 
+        if token.get("include_in_portfolio", False) is True
+    ]
+    
+    print(f"    ✅ Found {len(portfolio_ids)} tokens to include: {portfolio_ids}")
+    if not portfolio_ids:
+        print("    ⚠️  No tokens have include_in_portfolio: true")
+    
+    return portfolio_ids
+
+
 def load_data(coin_name: str) -> pd.DataFrame:
     """Load CSV with robust ISO8601 datetime parsing."""
     file_path = Path(CONFIG["data_dir"]) / f"{coin_name}.csv"
     if not file_path.exists():
         raise FileNotFoundError(f"❌ File not found: {file_path}")
 
-    print(f"    Loading {coin_name.upper()} data from {file_path}...")
+    print(f"    Loading {coin_name} data from {file_path}...")
 
     df = pd.read_csv(file_path)
     df["datetime_utc"] = pd.to_datetime(df["datetime"], format='ISO8601', utc=True)
@@ -134,8 +168,10 @@ def main():
     print("🚀 Starting 24h price change bootstrap analysis (KST 2 PM day end)\n")
     print(f"Config → {CONFIG['months_back']} months back | {CONFIG['bootstrap_samples']} bootstraps\n")
 
-    for coin in CONFIG["coins"]:
-        print(f"Analyzing {coin.upper()}...")
+    coins = load_portfolio_tokens()
+
+    for coin in coins:
+        print(f"\nAnalyzing {coin}...")
         try:
             df = load_data(coin)
             daily_df = get_daily_closes(df)
@@ -162,7 +198,7 @@ def main():
                 plt.hist(returns, bins=60, alpha=0.75, color='skyblue', edgecolor='black')
                 plt.axvline(stats["most_likely_kde_mode_%"], color='red', linestyle='--', linewidth=2,
                             label=f'Most Likely (KDE): {stats["most_likely_kde_mode_%"]:.2f}%')
-                plt.title(f"{coin.upper()} — 24h % Change Distribution\n(Past {CONFIG['months_back']} months)")
+                plt.title(f"{coin} — 24h % Change Distribution\n(Past {CONFIG['months_back']} months)")
                 plt.xlabel("24h Price Change (%)")
                 plt.ylabel("Frequency")
                 plt.legend()
@@ -172,10 +208,12 @@ def main():
                 plt.close()
                 print(f"\nPlot saved → {plot_path}")
 
-            print(f"Results saved to ./{CONFIG['output_dir']}/\n")
+            print(f"Results saved to ./{CONFIG['output_dir']}/ for {coin}")
 
         except Exception as e:
             print(f"   ❌ Error processing {coin}: {e}\n")
+
+    print("\n🎉 Analysis completed for all portfolio tokens!")
 
 
 if __name__ == "__main__":
