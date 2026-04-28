@@ -149,7 +149,7 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)   # keep original columns
                 writer.writeheader()
                 writer.writerows(filtered_rows)
-            print(f"✅ Cleaned '{input_path.name}' (duplicate snapshots removed)")
+            print(f"Cleaned '{input_path.name}' (duplicate snapshots removed)")
         else:
             print(f"No changes needed – '{input_path.name}' already clean")
 
