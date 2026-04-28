@@ -15,6 +15,16 @@ CONFIG = {
     'bar_char1': "█",                                            # LEFT side = Bought portion
     'bar_char2': "─",                                            # RIGHT side = Sold portion
 }
+
+# New clean field list (matches the updated tokens_balance.py)
+# sell_token_to_50_50 and sell_usdc_to_50_50 have been removed
+CSV_FIELDNAMES: list[str] = [
+    "timestamp_kst", "wallet_address", "token_id",
+    "token_balance", "usdc_balance",
+    "token_price_usd", "usdc_price_usd", "token_value_usd",
+    "usdc_value_usd", "total_value_usd", "token_pct", "usdc_pct",
+    "hypothetical_token_equivalent", "assumed_slippage"
+]
 # =======================================================
 
 # Set global Decimal precision (only affects calculations, never the source data)
@@ -117,6 +127,7 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
     """
     Process a single portfolio CSV file for the given token_id.
     Handles cleaning duplicate snapshots and tracks buy/sell activity.
+    Now also removes the obsolete sell_token_to_50_50 / sell_usdc_to_50_50 columns.
     """
     if not input_path.exists():
         print(f"❌ Error: '{input_path}' not found.")
@@ -126,7 +137,7 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
     with open(input_path, 'r', newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         original_rows = list(reader)
-        fieldnames = reader.fieldnames or []
+        original_fieldnames = reader.fieldnames or []
 
     # === EXPLICIT EDGE-CASE HANDLING ===
     if not original_rows:
@@ -164,19 +175,19 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
         print(f"Filtered down to {len(filtered_rows):,} meaningful rows "
               f"(removed {removed_count:,} rows with no balance change)")
 
-        # Step 3: OVERWRITE only if we actually removed rows
+        # Step 3: OVERWRITE with CLEAN field list (removes obsolete sell columns)
         if removed_count > 0 and filtered_rows:
             with open(input_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
                 writer.writeheader()
                 writer.writerows(filtered_rows)
-            print(f"Original file '{input_path.name}' has been overwritten with the cleaned version")
+            print(f"✅ Cleaned '{input_path.name}' → obsolete sell_* columns removed")
             print("   → Only rows where token or USDC balance actually changed are kept")
         else:
             print(f"No changes needed – '{input_path.name}' already contains only meaningful rows")
             filtered_rows = original_rows
 
-    # Step 4: Track added vs removed
+    # Step 4: Track added vs removed (unchanged logic)
     total_token_added = Decimal('0')
     total_token_removed = Decimal('0')
     balance_changes = []
@@ -204,7 +215,7 @@ def process_portfolio(input_path: Path, token_id: str) -> None:
 
     current_price = get_current_price(token_id)
 
-    # Step 5: Rich console summary
+    # Step 5: Rich console summary (unchanged)
     print("\n" + "=" * 70)
     print(f"{token_id} BALANCE FLOW SUMMARY")
     print("=" * 70)
