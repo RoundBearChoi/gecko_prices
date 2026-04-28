@@ -12,16 +12,22 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PLOT_RECENT_MONTHS = 12
 RECENT_DAYS_FOR_SUMMARY = 30
 DPI = 150
-FIG_SIZE = (15, 8)
+FIG_SIZE = (15, 10)          # taller for price + volume panels
 
-# Short MA momentum windows (easily extensible)
+# Short MA momentum windows
 SHORT_MA_MOMENTUM_WINDOWS = [6, 12, 24]
+
+# === VOLUME BAR STYLING (now much more visible) ===
+VOLUME_BAR_COLOR = '#1f77b4'   # Strong blue — matches price line, highly visible
+VOLUME_BAR_ALPHA = 0.92        # Very solid opacity
+VOLUME_BAR_EDGECOLOR = '#2c3e50'  # Dark edges for crisp definition
+VOLUME_BAR_LINEWIDTH = 0.4
 
 # =======================================================
 
 # Command-line argument for maximum flexibility
 parser = argparse.ArgumentParser(
-    description="Generate price chart(s) with Short & Long MAs. "
+    description="Generate price + VOLUME chart(s) with Short & Long MAs. "
                 "Default: all tokens where include_in_portfolio=true"
 )
 parser.add_argument(
@@ -95,7 +101,7 @@ def load_token_config(coin_id: str):
 
 
 def generate_price_chart(coin_id: str, csv_path: str = None):
-    """Core logic for one token – extracted for clean multi-token support"""
+    """Core logic for one token – now includes volume panel below price + MAs"""
     if csv_path is None:
         csv_path = os.path.join(SCRIPT_DIR, 'price_data', f'{coin_id}.csv')
 
@@ -129,7 +135,7 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
     SHORT_MA_WINDOW = token_config["short_term_hours"]
     LONG_MA_WINDOW = token_config["long_term_hours"]
 
-    # === Convert hours to days for legend & title (user request) ===
+    # === Convert hours to days for legend & title ===
     short_days = SHORT_MA_WINDOW // 24
     long_days = LONG_MA_WINDOW // 24
 
@@ -185,7 +191,7 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
         else:
             print(f"  {hours:2d}h : N/A (insufficient data)")
 
-    # === Plotting (MA values from full data, but chart limited to recent months) ===
+    # === Plotting with Price + Volume panels ===
     plot_df = df.copy()
     if PLOT_RECENT_MONTHS is not None and PLOT_RECENT_MONTHS > 0:
         cutoff = df['datetime_kst'].max() - pd.DateOffset(months=PLOT_RECENT_MONTHS)
@@ -193,48 +199,73 @@ def generate_price_chart(coin_id: str, csv_path: str = None):
         print(f"Plotting only the last {PLOT_RECENT_MONTHS} months of data")
 
     sns.set_style("darkgrid")
-    plt.figure(figsize=FIG_SIZE)
+    
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1,
+        figsize=FIG_SIZE,
+        height_ratios=[3, 1],
+        sharex=True
+    )
 
-    plt.plot(plot_df['datetime_kst'], plot_df['price_usd'],
+    # Top panel: Price + MAs
+    ax1.plot(plot_df['datetime_kst'], plot_df['price_usd'],
              label='Price (USD)', color='#1f77b4', linewidth=1.8, alpha=0.95)
-    plt.plot(plot_df['datetime_kst'], plot_df['short_ma'],
+    ax1.plot(plot_df['datetime_kst'], plot_df['short_ma'],
              label=f'Short MA ({SHORT_MA_WINDOW}h / {short_days}d)', 
              color='#ff7f0e', linewidth=2)
-    plt.plot(plot_df['datetime_kst'], plot_df['long_ma'],
+    ax1.plot(plot_df['datetime_kst'], plot_df['long_ma'],
              label=f'Long MA ({LONG_MA_WINDOW}h / {long_days}d)', 
              color='#2ca02c', linewidth=2)
 
-    # Updated title with both hours and days
-    TITLE = (f'{coin_id.upper()} Price (USD) — '
+    ax1.set_ylabel('Price in USD', fontsize=12)
+    ax1.legend(fontsize=11, loc='upper left')
+    ax1.grid(True, alpha=0.3)
+    ax1.tick_params(axis='x', labelbottom=False)
+
+    # Bottom panel: Volume bars — now VERY visible
+    volume_plotted = False
+    if 'total_volume' in plot_df.columns and not plot_df['total_volume'].dropna().empty:
+        bar_width_days = 1.0 / 24.0
+        print(f"✅ Using volume bar color: {VOLUME_BAR_COLOR} (alpha={VOLUME_BAR_ALPHA})")  # debug confirmation
+        ax2.bar(plot_df['datetime_kst'], plot_df['total_volume'],
+                color=VOLUME_BAR_COLOR,
+                alpha=VOLUME_BAR_ALPHA,
+                width=bar_width_days,
+                edgecolor=VOLUME_BAR_EDGECOLOR,
+                linewidth=VOLUME_BAR_LINEWIDTH)
+        ax2.set_ylabel('Volume (USD)', fontsize=12)
+        volume_plotted = True
+    if not volume_plotted:
+        ax2.text(0.5, 0.5, 'Volume data not available',
+                 horizontalalignment='center', verticalalignment='center',
+                 transform=ax2.transAxes, fontsize=12, color='gray')
+        ax2.set_ylabel('Volume (USD)', fontsize=12)
+
+    ax2.grid(True, alpha=0.3)
+
+    # Title + labels
+    TITLE = (f'{coin_id.upper()} Price & Volume (USD) — '
              f'Short MA ({SHORT_MA_WINDOW}h / {short_days}d) & '
              f'Long MA ({LONG_MA_WINDOW}h / {long_days}d)')
+    fig.suptitle(TITLE, fontsize=16, y=0.98)
+    ax2.set_xlabel('Date / Time (Korea Standard Time)', fontsize=12)
 
-    plt.title(TITLE, fontsize=16, pad=20)
-    plt.xlabel('Date / Time (Korea Standard Time)', fontsize=12)
-    plt.ylabel('Price in USD', fontsize=12)
-    plt.legend(fontsize=11, loc='upper left')
     plt.xticks(rotation=45, ha='right')
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
 
-    # === Dynamic filename with months indicator ===
-    if PLOT_RECENT_MONTHS is not None and PLOT_RECENT_MONTHS > 0:
-        months_str = f"{int(PLOT_RECENT_MONTHS)}m"
-    else:
-        months_str = "full"
-    
-    OUTPUT_FILE = f'{coin_id}_price_ma_{months_str}_kst.png'
+    # Dynamic filename
+    months_str = f"{int(PLOT_RECENT_MONTHS)}m" if PLOT_RECENT_MONTHS and PLOT_RECENT_MONTHS > 0 else "full"
+    OUTPUT_FILE = f'{coin_id}_price_volume_ma_{months_str}_kst.png'
 
     # Save chart
-    plt.savefig(OUTPUT_FILE, dpi=DPI, bbox_inches='tight')
+    fig.savefig(OUTPUT_FILE, dpi=DPI, bbox_inches='tight')
     print(f"\nChart saved as '{OUTPUT_FILE}' (DPI = {DPI})")
-    plt.close()
+    plt.close(fig)
 
 
 # ==================== MAIN EXECUTION ====================
 if __name__ == "__main__":
     if args.portfolio or (args.coin is None and args.csv is None):
-        # PORTFOLIO MODE (default)
         portfolio = get_portfolio_tokens()
         print(f"Generating charts for {len(portfolio)} portfolio token(s)...")
         for token in portfolio:
@@ -242,7 +273,6 @@ if __name__ == "__main__":
             if coin_id:
                 generate_price_chart(coin_id)
     else:
-        # SINGLE TOKEN MODE
         if args.csv:
             coin_id = os.path.splitext(os.path.basename(args.csv))[0]
             generate_price_chart(coin_id, args.csv)
