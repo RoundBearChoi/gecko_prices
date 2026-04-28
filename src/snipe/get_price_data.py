@@ -28,7 +28,7 @@ CONFIG = {
     "OUTPUT_DIR": "price_data",
     "FORCE_FRESH_DOWNLOAD": True,
     "VS_CURRENCY": "usd",
-    "MONTHS_BACK": 3,
+    "MONTHS_BACK": 6,
     "CHUNK_DAYS": 90,
     "SLEEP_BETWEEN_CALLS": 1.2,
     "PRECISION": "full",          # ← absolute max from CoinGecko

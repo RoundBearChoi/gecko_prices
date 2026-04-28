@@ -12,21 +12,21 @@
     "mint": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump",
     "include_in_portfolio": true,
     "comment": "",
-    "short_term_hours": 168,
-    "long_term_hours": 720
+    "short_term_hours": 120,
+    "long_term_hours": 360
   },
   {
     "id": "popcat",
     "mint": "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
     "include_in_portfolio": true,
     "comment": "",
-    "short_term_hours": 168,
-    "long_term_hours": 720
+    "short_term_hours": 120,
+    "long_term_hours": 360
   },
   {
     "id": "useless-3",
     "mint": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
-    "include_in_portfolio": true,
+    "include_in_portfolio": false,
     "comment": "",
     "short_term_hours": 168,
     "long_term_hours": 720
@@ -34,7 +34,7 @@
   {
     "id": "neet",
     "mint": "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump",
-    "include_in_portfolio": true,
+    "include_in_portfolio": false,
     "comment": "",
     "short_term_hours": 168,
     "long_term_hours": 720
@@ -42,7 +42,7 @@
   {
     "id": "troll-2",
     "mint": "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2",
-    "include_in_portfolio": true,
+    "include_in_portfolio": false,
     "comment": "",
     "short_term_hours": 168,
     "long_term_hours": 720
