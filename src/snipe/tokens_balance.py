@@ -36,6 +36,13 @@ KST_TZ = ZoneInfo("Asia/Seoul")
 SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 
+# =============================================================================
+# Token Program Selection
+# =============================================================================
+USE_TOKEN_2022_PROGRAM: bool = False   # ← Set to False to skip Token-2022 (TokenzQd...) entirely.
+                                      #    SPL Token (Tokenkeg...) is ALWAYS checked by default.
+                                      #    This saves one RPC call and ~2 seconds when disabled.
+
 RPC_RETRY_DELAY_SECONDS: int = 20
 RPC_DELAY_BETWEEN_CALLS_SECONDS: float = 2
 
@@ -73,7 +80,13 @@ def retry(max_retries: int = 5, delay: int = RPC_RETRY_DELAY_SECONDS):
 @retry()
 def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
     token_data: dict[str, dict] = {}
-    programs = [SPL_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]
+    
+    # Always include standard SPL Token program; optionally add Token-2022
+    programs = [SPL_TOKEN_PROGRAM_ID]
+    if USE_TOKEN_2022_PROGRAM:
+        programs.append(TOKEN_2022_PROGRAM_ID)
+    else:
+        print("    Token-2022 program support disabled in config (USE_TOKEN_2022_PROGRAM=False)")
     
     for program_id in programs:
         payload = {
@@ -252,7 +265,9 @@ def main():
                 break
             print("❌ Invalid address (32-44 base58 chars).")
 
-    print("\nFetching liquid token balances (Token + Token-2022 — only 2 RPC calls)...")
+    # Updated fetching message that reflects the config choice
+    program_count = 1 + int(USE_TOKEN_2022_PROGRAM)
+    print(f"\nFetching liquid token balances (SPL Token{' + Token-2022' if USE_TOKEN_2022_PROGRAM else ''} — {program_count} RPC call{'s' if program_count > 1 else ''})...")
     
     token_accounts = get_all_token_accounts(wallet)
     
