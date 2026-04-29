@@ -12,11 +12,11 @@ from decimal import Decimal, getcontext
 # ==================== CONFIG SECTION ====================
 UPDATE_INTERVAL_MINUTES = 5
 BAR_WIDTH = 50
-CLEAR_SCREEN_ON_UPDATE = True        # Linux-optimized: clears terminal for a clean dashboard each cycle
+CLEAR_SCREEN_ON_UPDATE = True
 USE_COLORS = True                    # Enable ANSI colors (for Linux terminals)
 
 # Sound alert configuration
-SOUND_FILE = "kim_dust.mp3"             # Put your sound file (mp3, wav, ogg, etc.) in the SAME folder as this script
+SOUND_FILE = "kim_dust.mp3"             # Put sound file in the SAME folder as this script
 PRICE_CHANGE_THRESHOLD_PERCENT = 5   # % change that triggers sound + Telegram alert
 
 # Telegram Bot configuration (loaded from environment variables)
