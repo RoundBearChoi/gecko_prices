@@ -19,7 +19,7 @@ USDC_GECKO_ID: str = "usd-coin"
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TOKENS_LIST_PATH: str = os.path.join(SCRIPT_DIR, "tokens_list.json")
-WALLETS_CSV_PATH: str = os.path.join(SCRIPT_DIR, "wallets.csv")   # ← Only source of wallet addresses
+WALLETS_CSV_PATH: str = os.path.join(SCRIPT_DIR, "wallets.csv")
 
 RPC_URL: str = "https://api.mainnet-beta.solana.com"
 COINGECKO_BASE: str = "https://api.coingecko.com/api/v3"
@@ -38,12 +38,7 @@ KST_TZ = ZoneInfo("Asia/Seoul")
 SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 
-# =============================================================================
-# Token Program Selection
-# =============================================================================
-USE_TOKEN_2022_PROGRAM: bool = False   # ← Set to False to skip Token-2022 (TokenzQd...) entirely.
-                                      #    SPL Token (Tokenkeg...) is ALWAYS checked by default.
-                                      #    This saves one RPC call and ~2 seconds when disabled.
+USE_TOKEN_2022_PROGRAM: bool = False
 
 RPC_RETRY_DELAY_SECONDS: int = 20
 RPC_DELAY_BETWEEN_CALLS_SECONDS: float = 2
@@ -61,6 +56,17 @@ def console_round_balance(value: Decimal) -> Decimal:
 
 def console_round_usd(value: Decimal) -> Decimal:
     return value.quantize(Decimal('1.' + '0' * CONSOLE_USD_ROUNDING))
+
+# === NEW: FORMATTED OUTPUT WITH THOUSANDS SEPARATORS ===
+def console_format_balance(value: Decimal) -> str:
+    """Format token balance with thousands separator + fixed decimals (for summary only)"""
+    rounded = console_round_balance(value)
+    return f"{float(rounded):,.{CONSOLE_BALANCE_ROUNDING}f}"
+
+def console_format_usd(value: Decimal) -> str:
+    """Format USD value with thousands separator + fixed decimals (for summary only)"""
+    rounded = console_round_usd(value)
+    return f"{float(rounded):,.{CONSOLE_USD_ROUNDING}f}"
 
 def retry(max_retries: int = 5, delay: int = RPC_RETRY_DELAY_SECONDS):
     def decorator(func):
@@ -82,8 +88,6 @@ def retry(max_retries: int = 5, delay: int = RPC_RETRY_DELAY_SECONDS):
 @retry()
 def get_all_token_accounts(wallet_address: str) -> dict[str, dict]:
     token_data: dict[str, dict] = {}
-    
-    # Always include standard SPL Token program; optionally add Token-2022
     programs = [SPL_TOKEN_PROGRAM_ID]
     if USE_TOKEN_2022_PROGRAM:
         programs.append(TOKEN_2022_PROGRAM_ID)
@@ -183,8 +187,6 @@ def load_tokens_config() -> list[dict]:
         return data
 
 def load_wallets() -> list[dict]:
-    """Load wallets from CSV ONLY. No addresses are hardcoded anywhere in the script.
-    Exits immediately if wallets.csv is missing (as requested)."""
     print(f"Looking for wallets.csv at: {WALLETS_CSV_PATH}")
     if not os.path.exists(WALLETS_CSV_PATH):
         print(f"❌ wallets.csv not found at {WALLETS_CSV_PATH}")
@@ -240,11 +242,7 @@ def calculate_hypothetical_all_in_token(
     additional_token = usdc_value / token_price if token_price > 0 else Decimal("0")
     return token_balance + additional_token
 
-# =============================================================================
-# BALANCE CHANGE DETECTION (for main portfolio CSV only)
-# =============================================================================
 def has_balance_changed(csv_path: str, current_token_balance: Decimal, current_usdc_balance: Decimal) -> bool:
-    """Return True if we should save: no file, empty file, or balances actually changed."""
     if not os.path.exists(csv_path):
         return True
     
@@ -259,8 +257,6 @@ def has_balance_changed(csv_path: str, current_token_balance: Decimal, current_u
             try:
                 prev_token = Decimal(last_row.get("token_balance", "0"))
                 prev_usdc = Decimal(last_row.get("usdc_balance", "0"))
-                
-                # Exact match (on-chain token amounts are precise)
                 if prev_token == current_token_balance and prev_usdc == current_usdc_balance:
                     return False
                 return True
@@ -269,8 +265,7 @@ def has_balance_changed(csv_path: str, current_token_balance: Decimal, current_u
                 return True
     except Exception as e:
         print(f"⚠️  Could not read CSV for balance change detection: {e}")
-        return True  # safer to save than lose data
-
+        return True
 
 def main():
     print("=" * 80)
@@ -280,14 +275,11 @@ def main():
     print("=" * 80)
 
     tokens_config = load_tokens_config()
-
-    # === Wallet selection from CSV ONLY (no hardcoded addresses anywhere) ===
     wallets = load_wallets()
 
     print("\n" + "=" * 80)
     print("    SELECT WALLET TO ANALYZE")
     print("=" * 80)
-    # === MODIFIED SECTION: single-line prompt as requested ===
     for i, w in enumerate(wallets, 1):
         label = w.get("label") or w.get("name") or "Unknown"
         addr = w.get("wallet_address") or w.get("address") or ""
@@ -315,7 +307,6 @@ def main():
     if not wallet:
         sys.exit(1)
 
-    # Updated fetching message that reflects the config choice
     program_count = 1 + int(USE_TOKEN_2022_PROGRAM)
     print(f"\nFetching liquid token balances (SPL Token{' + Token-2022' if USE_TOKEN_2022_PROGRAM else ''} — {program_count} RPC call{'s' if program_count > 1 else ''})...")
     
@@ -394,12 +385,15 @@ def main():
         "assumed_slippage": str(SLIPPAGE_ASSUMED)
     }
 
-    # === STARTING POINT CSV (completely unchanged) ===
+    # === STARTING POINT CSV ===
     starting_point_filename = f"starting_point_{main_token_id}.csv"
     starting_point_path = os.path.join(CSV_OUTPUT_DIR, starting_point_filename)
+    
+    # DEFAULTS (first run or missing CSV)
     starting_equiv = hypothetical_token
     starting_total_usd = total_value
     starting_price = main_price
+    starting_token_balance: Decimal = main_balance
 
     if os.path.exists(starting_point_path):
         try:
@@ -413,6 +407,12 @@ def main():
                         starting_total_usd = Decimal(rows[0]["total_value_usd"])
                     if "token_price_usd" in rows[0]:
                         starting_price = Decimal(rows[0]["token_price_usd"])
+                    if "token_balance" in rows[0]:
+                        try:
+                            starting_token_balance = Decimal(rows[0]["token_balance"])
+                        except (InvalidOperation, ValueError, TypeError):
+                            print("⚠️  Could not parse starting token balance from CSV - using current balance")
+                            starting_token_balance = main_balance
         except Exception as e:
             print(f"⚠️  Could not read starting_point_{main_token_id}.csv: {e}")
     else:
@@ -426,7 +426,11 @@ def main():
         except Exception as e:
             print(f"❌ Failed to create starting_point CSV: {e}")
 
-    # === DELTA CALCULATIONS (unchanged) ===
+    # === TOKEN BALANCE DELTA ===
+    token_balance_delta = main_balance - starting_token_balance
+    token_delta_usd = token_balance_delta * main_price if main_price > 0 else Decimal("0")
+
+    # === DELTA CALCULATIONS ===
     equiv_delta = hypothetical_token - starting_equiv
     usd_delta = equiv_delta * main_price if main_price > 0 else Decimal("0")
     usd_equiv_delta = total_value - starting_total_usd
@@ -441,17 +445,22 @@ def main():
     print(f"Timestamp (KST)           : {now_kst.strftime('%Y-%m-%d %H:%M:%S KST')}")
     print(f"Main token                : {main_token_id}")
     print(f"Assumed slippage          : {SLIPPAGE_ASSUMED*100:.2f}%")
-    print(f"current token balance     : {console_round_balance(main_balance)} (${console_round_usd(token_value):,.{CONSOLE_USD_ROUNDING}f})")
-    print(f"{USDC_GECKO_ID} balance          : {console_round_balance(usdc_balance)} (${console_round_usd(usdc_value):,.{CONSOLE_USD_ROUNDING}f})")
-    print(f"token equivalent          : {console_round_balance(hypothetical_token)} {main_token_id}")
-    print(f"token equiv delta         : {console_round_balance(equiv_delta)} {main_token_id} (${console_round_usd(usd_delta):+,.{CONSOLE_USD_ROUNDING}f})")
-    print(f"USD equivalent            : ${console_round_usd(total_value):,.{CONSOLE_USD_ROUNDING}f} USD")
-    print(f"USD equivalent delta      : ${console_round_usd(usd_equiv_delta):+,.{CONSOLE_USD_ROUNDING}f} USD ({usd_equiv_pct_change:+.4f}%)")
+    
+    # === UPDATED SUMMARY WITH THOUSANDS SEPARATORS ===
+    print(f"current token balance     : {console_format_balance(main_balance)} (${console_format_usd(token_value)})")
+    print(f"starting token balance    : {console_format_balance(starting_token_balance)}")
+    print(f"token balance delta       : {console_format_balance(token_balance_delta)} (${console_format_usd(token_delta_usd)})")
+    
+    print(f"{USDC_GECKO_ID} balance          : {console_format_balance(usdc_balance)} (${console_format_usd(usdc_value)})")
+    print(f"token equivalent          : {console_format_balance(hypothetical_token)} {main_token_id}")
+    print(f"token equiv delta         : {console_format_balance(equiv_delta)} {main_token_id} (${console_format_usd(usd_delta)})")
+    print(f"USD equivalent            : ${console_format_usd(total_value)} USD")
+    print(f"USD equivalent delta      : ${console_format_usd(usd_equiv_delta)} USD ({usd_equiv_pct_change:+.4f}%)")
     
     print("-" * 80)
-    print(f"Starting price            : ${console_round_usd(starting_price)}")
-    print(f"Current price             : ${console_round_usd(main_price)}")
-    print(f"Price change              : ${console_round_usd(price_delta):+,.{CONSOLE_USD_ROUNDING}f} ({price_pct_change:+.4f}%)")
+    print(f"Starting price            : ${console_format_usd(starting_price)}")
+    print(f"Current price             : ${console_format_usd(main_price)}")
+    print(f"Price change              : ${console_format_usd(price_delta)} ({price_pct_change:+.4f}%)")
 
     print(f"token %                   : {console_round_usd(token_pct):.4f}%")
     print(f"{USDC_GECKO_ID} %                : {console_round_usd(usdc_pct):.4f}%")
@@ -461,10 +470,12 @@ def main():
     if sell_token > 0:
         sell_value = sell_token * main_price
         sell_pct = (sell_value / total_value * Decimal("100")) if total_value > 0 else Decimal("0")
+        # NO thousands separator here (as requested)
         print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_token)} {main_token_id} (${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) ({console_round_usd(sell_pct):.4f}% of portfolio)")
     elif sell_usdc > 0:
         sell_value = sell_usdc * usdc_price
         sell_pct = (sell_value / total_value * Decimal("100")) if total_value > 0 else Decimal("0")
+        # NO thousands separator here (as requested)
         print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_usdc)} {USDC_GECKO_ID} (${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) ({console_round_usd(sell_pct):.4f}% of portfolio)")
     else:
         print("✅ Portfolio is already perfectly balanced at 50/50!")
@@ -474,7 +485,7 @@ def main():
     if main_price == 0:
         print("⚠️  Note: Token price returned zero - calculations may be inaccurate.")
 
-    # === CSV EXPORT: ONLY WHEN BALANCE CHANGES (or first run) ===
+    # === CSV EXPORT ===
     csv_filename = f"solana_portfolio_{main_token_id}_usdc.csv"
     csv_path = os.path.join(CSV_OUTPUT_DIR, csv_filename)
 
@@ -495,7 +506,6 @@ def main():
               f"Latest data shown in console but NOT saved to CSV.")
 
     print("\nScript completed successfully!")
-
 
 if __name__ == "__main__":
     try:
