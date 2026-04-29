@@ -467,14 +467,31 @@ def main():
     summary_lines.append("-" * 80)
 
     slippage_pct_str = f"{SLIPPAGE_ASSUMED*100:.1f}%"
+    
     if sell_token > 0:
         sell_value = sell_token * main_price
         sell_pct = (sell_value / total_value * Decimal("100")) if total_value > 0 else Decimal("0")
-        summary_lines.append(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_token)} {main_token_id} (${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) ({console_round_usd(sell_pct):.4f}% of portfolio)")
+        # Approximate amount of the stable asset you would receive (at current price)
+        buy_amount = sell_value / usdc_price if usdc_price > 0 else Decimal("0")
+        summary_lines.append(
+            f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): "
+            f"Sell {console_round_balance(sell_token)} {main_token_id} "
+            f"(${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) "
+            f"({console_round_usd(sell_pct):.4f}% of portfolio) "
+            f"for ~{console_round_balance(buy_amount)} {USDC_GECKO_ID}"
+        )
     elif sell_usdc > 0:
         sell_value = sell_usdc * usdc_price
         sell_pct = (sell_value / total_value * Decimal("100")) if total_value > 0 else Decimal("0")
-        summary_lines.append(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_usdc)} {USDC_GECKO_ID} (${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) ({console_round_usd(sell_pct):.4f}% of portfolio)")
+        # Approximate amount of the main token you would receive (at current price)
+        buy_amount = sell_value / main_price if main_price > 0 else Decimal("0")
+        summary_lines.append(
+            f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): "
+            f"Sell {console_round_balance(sell_usdc)} {USDC_GECKO_ID} "
+            f"(${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) "
+            f"({console_round_usd(sell_pct):.4f}% of portfolio) "
+            f"for ~{console_round_balance(buy_amount)} {main_token_id}"
+        )
     else:
         summary_lines.append("✅ Portfolio is already perfectly balanced at 50/50!")
 
