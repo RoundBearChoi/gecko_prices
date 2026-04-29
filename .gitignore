@@ -216,3 +216,6 @@ __marimo__/
 *.csv
 *.csv#
 *.ods#
+
+# private summary files
+*_summary.txt

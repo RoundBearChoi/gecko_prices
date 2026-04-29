@@ -57,7 +57,6 @@ def console_round_balance(value: Decimal) -> Decimal:
 def console_round_usd(value: Decimal) -> Decimal:
     return value.quantize(Decimal('1.' + '0' * CONSOLE_USD_ROUNDING))
 
-# === NEW: FORMATTED OUTPUT WITH THOUSANDS SEPARATORS ===
 def console_format_balance(value: Decimal) -> str:
     """Format token balance with thousands separator + fixed decimals (for summary only)"""
     rounded = console_round_balance(value)
@@ -438,52 +437,64 @@ def main():
     price_delta = main_price - starting_price
     price_pct_change = (price_delta / starting_price * Decimal("100")) if starting_price > 0 else Decimal("0")
 
-    print("\n" + "=" * 80)
-    print(f"📊 {main_token_id} + {USDC_GECKO_ID} portfolio summary")
-    print("=" * 80)
-    print(f"Wallet                    : {wallet}")
-    print(f"Timestamp (KST)           : {now_kst.strftime('%Y-%m-%d %H:%M:%S KST')}")
-    print(f"Main token                : {main_token_id}")
-    print(f"Assumed slippage          : {SLIPPAGE_ASSUMED*100:.2f}%")
+    # === SUMMARY + REBALANCE OUTPUT (console + TXT file) ===
+    summary_lines = []
+    summary_lines.append("=" * 80)
+    summary_lines.append(f"📊 {main_token_id} + {USDC_GECKO_ID} portfolio summary")
+    summary_lines.append("=" * 80)
+    summary_lines.append(f"Wallet                    : {wallet}")
+    summary_lines.append(f"Timestamp (KST)           : {now_kst.strftime('%Y-%m-%d %H:%M:%S KST')}")
+    summary_lines.append(f"Main token                : {main_token_id}")
+    summary_lines.append(f"Assumed slippage          : {SLIPPAGE_ASSUMED*100:.2f}%")
     
-    # === UPDATED SUMMARY WITH THOUSANDS SEPARATORS ===
-    print(f"current token balance     : {console_format_balance(main_balance)} (${console_format_usd(token_value)})")
-    print(f"starting token balance    : {console_format_balance(starting_token_balance)}")
-    print(f"token balance delta       : {console_format_balance(token_balance_delta)} (${console_format_usd(token_delta_usd)})")
+    summary_lines.append(f"current token balance     : {console_format_balance(main_balance)} (${console_format_usd(token_value)})")
+    summary_lines.append(f"starting token balance    : {console_format_balance(starting_token_balance)}")
+    summary_lines.append(f"token balance delta       : {console_format_balance(token_balance_delta)} (${console_format_usd(token_delta_usd)})")
     
-    print(f"{USDC_GECKO_ID} balance          : {console_format_balance(usdc_balance)} (${console_format_usd(usdc_value)})")
-    print(f"token equivalent          : {console_format_balance(hypothetical_token)} {main_token_id}")
-    print(f"token equiv delta         : {console_format_balance(equiv_delta)} {main_token_id} (${console_format_usd(usd_delta)})")
-    print(f"USD equivalent            : ${console_format_usd(total_value)} USD")
-    print(f"USD equivalent delta      : ${console_format_usd(usd_equiv_delta)} USD ({usd_equiv_pct_change:+.4f}%)")
+    summary_lines.append(f"{USDC_GECKO_ID} balance          : {console_format_balance(usdc_balance)} (${console_format_usd(usdc_value)})")
+    summary_lines.append(f"token equivalent          : {console_format_balance(hypothetical_token)} {main_token_id}")
+    summary_lines.append(f"token equiv delta         : {console_format_balance(equiv_delta)} {main_token_id} (${console_format_usd(usd_delta)})")
+    summary_lines.append(f"USD equivalent            : ${console_format_usd(total_value)} USD")
+    summary_lines.append(f"USD equivalent delta      : ${console_format_usd(usd_equiv_delta)} USD ({usd_equiv_pct_change:+.4f}%)")
     
-    print("-" * 80)
-    print(f"Starting price            : ${console_format_usd(starting_price)}")
-    print(f"Current price             : ${console_format_usd(main_price)}")
-    print(f"Price change              : ${console_format_usd(price_delta)} ({price_pct_change:+.4f}%)")
+    summary_lines.append("-" * 80)
+    summary_lines.append(f"Starting price            : ${console_format_usd(starting_price)}")
+    summary_lines.append(f"Current price             : ${console_format_usd(main_price)}")
+    summary_lines.append(f"Price change              : ${console_format_usd(price_delta)} ({price_pct_change:+.4f}%)")
 
-    print(f"token %                   : {console_round_usd(token_pct):.4f}%")
-    print(f"{USDC_GECKO_ID} %                : {console_round_usd(usdc_pct):.4f}%")
-    print("-" * 80)
+    summary_lines.append(f"token %                   : {console_round_usd(token_pct):.4f}%")
+    summary_lines.append(f"{USDC_GECKO_ID} %                : {console_round_usd(usdc_pct):.4f}%")
+    summary_lines.append("-" * 80)
 
     slippage_pct_str = f"{SLIPPAGE_ASSUMED*100:.1f}%"
     if sell_token > 0:
         sell_value = sell_token * main_price
         sell_pct = (sell_value / total_value * Decimal("100")) if total_value > 0 else Decimal("0")
-        # NO thousands separator here (as requested)
-        print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_token)} {main_token_id} (${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) ({console_round_usd(sell_pct):.4f}% of portfolio)")
+        summary_lines.append(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_token)} {main_token_id} (${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) ({console_round_usd(sell_pct):.4f}% of portfolio)")
     elif sell_usdc > 0:
         sell_value = sell_usdc * usdc_price
         sell_pct = (sell_value / total_value * Decimal("100")) if total_value > 0 else Decimal("0")
-        # NO thousands separator here (as requested)
-        print(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_usdc)} {USDC_GECKO_ID} (${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) ({console_round_usd(sell_pct):.4f}% of portfolio)")
+        summary_lines.append(f"🔄 To reach 50/50 (assuming {slippage_pct_str} slippage): Sell {console_round_balance(sell_usdc)} {USDC_GECKO_ID} (${console_round_usd(sell_value):,.{CONSOLE_USD_ROUNDING}f}) ({console_round_usd(sell_pct):.4f}% of portfolio)")
     else:
-        print("✅ Portfolio is already perfectly balanced at 50/50!")
+        summary_lines.append("✅ Portfolio is already perfectly balanced at 50/50!")
 
-    print("-" * 80)
+    summary_lines.append("-" * 80)
 
     if main_price == 0:
-        print("⚠️  Note: Token price returned zero - calculations may be inaccurate.")
+        summary_lines.append("⚠️  Note: Token price returned zero - calculations may be inaccurate.")
+
+    # Print to console
+    print("\n".join(summary_lines))
+
+    # === SAVE SUMMARY TO TXT FILE ===
+    summary_filename = f"{main_token_id}_summary.txt"
+    summary_path = os.path.join(CSV_OUTPUT_DIR, summary_filename)
+    try:
+        with open(summary_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(summary_lines) + "\n")
+        print(f"✅ Summary saved to: {summary_path}")
+    except Exception as e:
+        print(f"❌ Failed to save summary TXT file: {e}")
 
     # === CSV EXPORT ===
     csv_filename = f"solana_portfolio_{main_token_id}_usdc.csv"
