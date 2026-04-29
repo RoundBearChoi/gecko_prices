@@ -16,8 +16,7 @@ CLEAR_SCREEN_ON_UPDATE = True        # Linux-optimized: clears terminal for a cl
 USE_COLORS = True                    # Enable ANSI colors (for Linux terminals)
 
 # Sound alert configuration
-PRICE_CHANGE_THRESHOLD_PERCENT = 5  # absolute %
-SOUND_FILE = "kim_dust.mp3"           # Sound file located in the same folder as this script
+PRICE_CHANGE_THRESHOLD_PERCENT = 5  # Sound file located in the same folder as this script
 
 # Telegram Bot configuration (loaded from environment variables)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -267,6 +266,29 @@ def main():
             sys.exit(0)
     
     api_key_used = bool(api_key)
+    
+    # ==================== NEW: PRICE_CHANGE_THRESHOLD_PERCENT PROMPT ====================
+    # Prompt added exactly after the key prompt, as requested
+    print("\n🔊 Sound Alert Threshold Setup")
+    global PRICE_CHANGE_THRESHOLD_PERCENT
+    try:
+        user_input = input(f"   Enter PRICE_CHANGE_THRESHOLD_PERCENT (default: {PRICE_CHANGE_THRESHOLD_PERCENT}): ").strip()
+        if user_input:
+            try:
+                new_threshold = float(user_input)
+                if new_threshold > 0:
+                    PRICE_CHANGE_THRESHOLD_PERCENT = new_threshold
+                    print(f"   ✅ Threshold set to {PRICE_CHANGE_THRESHOLD_PERCENT}%")
+                else:
+                    print(f"   ⚠️  Threshold must be > 0, using default {PRICE_CHANGE_THRESHOLD_PERCENT}%")
+            except ValueError:
+                print(f"   ⚠️  Invalid input, using default {PRICE_CHANGE_THRESHOLD_PERCENT}%")
+        else:
+            print(f"   ✅ Using default threshold: {PRICE_CHANGE_THRESHOLD_PERCENT}%")
+    except (EOFError, KeyboardInterrupt):
+        print("\nExiting...")
+        sys.exit(0)
+    # ================================================================================
     
     # Discover tokens first so we can send accurate startup message
     csv_files = get_csv_files()
