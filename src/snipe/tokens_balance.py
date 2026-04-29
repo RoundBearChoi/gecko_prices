@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import requests
 import csv
 from datetime import datetime
@@ -18,6 +19,7 @@ USDC_GECKO_ID: str = "usd-coin"
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TOKENS_LIST_PATH: str = os.path.join(SCRIPT_DIR, "tokens_list.json")
+WALLETS_CSV_PATH: str = os.path.join(SCRIPT_DIR, "wallets.csv")   # ← Only source of wallet addresses
 
 RPC_URL: str = "https://api.mainnet-beta.solana.com"
 COINGECKO_BASE: str = "https://api.coingecko.com/api/v3"
@@ -180,6 +182,32 @@ def load_tokens_config() -> list[dict]:
         print(f"Loaded {len(data)} tokens from tokens_list.json")
         return data
 
+def load_wallets() -> list[dict]:
+    """Load wallets from CSV ONLY. No addresses are hardcoded anywhere in the script.
+    Exits immediately if wallets.csv is missing (as requested)."""
+    print(f"Looking for wallets.csv at: {WALLETS_CSV_PATH}")
+    if not os.path.exists(WALLETS_CSV_PATH):
+        print(f"❌ wallets.csv not found at {WALLETS_CSV_PATH}")
+        print("   → Please create wallets.csv in the same folder as this script")
+        print("     using the data from your 'wallet addresses.ods' file (exclude trezor wallet).")
+        print("\n   Required CSV format (header + one row per wallet):")
+        print("""id,label,wallet_address,associated_token
+1,Your Wallet Label 1,YourSolanaAddressHere,tokenname
+2,Your Wallet Label 2,YourSolanaAddressHere,tokenname""")
+        print("\n   After creating the file, run the script again.")
+        sys.exit(1)
+
+    with open(WALLETS_CSV_PATH, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        wallets = list(reader)
+
+    if not wallets:
+        print("❌ wallets.csv exists but contains no data. Please add wallet entries.")
+        sys.exit(1)
+
+    print(f"Loaded {len(wallets)} wallets from wallets.csv")
+    return wallets
+
 def calculate_rebalance(
     token_balance: Decimal, usdc_balance: Decimal,
     token_price: Decimal, usdc_price: Decimal,
@@ -250,20 +278,45 @@ def main():
     print(f"    Dual Token/Token-2022 • Slippage-aware 50/50 rebalance")
     print(f"    Using {SLIPPAGE_ASSUMED*100:.1f}% assumed slippage")
     print(f"    Console rounding → Balances: {CONSOLE_BALANCE_ROUNDING} decimals | USD: {CONSOLE_USD_ROUNDING} decimals")
+    print(f"    Linux-optimized (shebang + wallet CSV selection only)")
     print("=" * 80)
 
     tokens_config = load_tokens_config()
 
-    if len(sys.argv) > 1:
-        wallet = sys.argv[1].strip()
-    else:
-        while True:
-            wallet = input("\nEnter your Solana wallet address (or 'exit'): ").strip()
-            if wallet.lower() == "exit":
-                sys.exit(0)
-            if 32 <= len(wallet) <= 44 and wallet.isalnum():
-                break
-            print("❌ Invalid address (32-44 base58 chars).")
+    # === Wallet selection from CSV ONLY (no hardcoded addresses anywhere) ===
+    wallets = load_wallets()
+
+    print("\n" + "=" * 80)
+    print("    SELECT WALLET TO ANALYZE")
+    print("=" * 80)
+    for i, w in enumerate(wallets, 1):
+        label = w.get("label") or w.get("name") or "Unknown"
+        addr = w.get("wallet_address") or w.get("address") or ""
+        token_hint = w.get("associated_token") or w.get("token") or "N/A"
+        addr_short = addr[:8] + "..." + addr[-4:] if len(addr) > 12 else addr
+        print(f"  {i}. {label}")
+        print(f"     Address : {addr_short}")
+        print(f"     Target token : {token_hint}")
+
+    wallet = None
+    while wallet is None:
+        choice = input(f"\nEnter wallet number (1-{len(wallets)}) or 'exit': ").strip()
+        if choice.lower() == "exit":
+            sys.exit(0)
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(wallets):
+                selected = wallets[idx]
+                wallet = selected.get("wallet_address") or selected.get("address")
+                label = selected.get("label") or selected.get("name") or "Selected wallet"
+                print(f"\n✅ Selected: {label} ({wallet})")
+            else:
+                print(f"❌ Number must be between 1 and {len(wallets)}.")
+        except ValueError:
+            print("❌ Please enter a valid number or 'exit'.")
+
+    if not wallet:
+        sys.exit(1)
 
     # Updated fetching message that reflects the config choice
     program_count = 1 + int(USE_TOKEN_2022_PROGRAM)
@@ -387,7 +440,6 @@ def main():
     print("\n" + "=" * 80)
     print(f"📊 {main_token_id} + {USDC_GECKO_ID} portfolio summary")
     print("=" * 80)
-    # ... (all the same console output as before) ...
     print(f"Wallet                    : {wallet}")
     print(f"Timestamp (KST)           : {now_kst.strftime('%Y-%m-%d %H:%M:%S KST')}")
     print(f"Main token                : {main_token_id}")

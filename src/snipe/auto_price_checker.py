@@ -10,13 +10,13 @@ from datetime import datetime
 from decimal import Decimal, getcontext
 
 # ==================== CONFIG SECTION ====================
-UPDATE_INTERVAL_MINUTES = 4
+UPDATE_INTERVAL_MINUTES = 5
 BAR_WIDTH = 50
 CLEAR_SCREEN_ON_UPDATE = True        # Linux-optimized: clears terminal for a clean dashboard each cycle
 USE_COLORS = True                    # Enable ANSI colors (for Linux terminals)
 
 # Sound alert configuration
-PRICE_CHANGE_THRESHOLD_PERCENT = 1.5  # absolute %
+PRICE_CHANGE_THRESHOLD_PERCENT = 5  # absolute %
 SOUND_FILE = "kim_dust.mp3"           # Sound file located in the same folder as this script
 
 # Telegram Bot configuration (loaded from environment variables)
