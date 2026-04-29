@@ -16,7 +16,8 @@ CLEAR_SCREEN_ON_UPDATE = True        # Linux-optimized: clears terminal for a cl
 USE_COLORS = True                    # Enable ANSI colors (for Linux terminals)
 
 # Sound alert configuration
-PRICE_CHANGE_THRESHOLD_PERCENT = 5  # Sound file located in the same folder as this script
+SOUND_FILE = "kim_dust.mp3"             # Put your sound file (mp3, wav, ogg, etc.) in the SAME folder as this script
+PRICE_CHANGE_THRESHOLD_PERCENT = 5   # % change that triggers sound + Telegram alert
 
 # Telegram Bot configuration (loaded from environment variables)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")

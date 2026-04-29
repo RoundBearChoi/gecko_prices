@@ -275,10 +275,8 @@ def has_balance_changed(csv_path: str, current_token_balance: Decimal, current_u
 def main():
     print("=" * 80)
     print("    Dynamic Solana Token + USDC Portfolio Analyzer")
-    print(f"    Dual Token/Token-2022 • Slippage-aware 50/50 rebalance")
     print(f"    Using {SLIPPAGE_ASSUMED*100:.1f}% assumed slippage")
     print(f"    Console rounding → Balances: {CONSOLE_BALANCE_ROUNDING} decimals | USD: {CONSOLE_USD_ROUNDING} decimals")
-    print(f"    Linux-optimized (shebang + wallet CSV selection only)")
     print("=" * 80)
 
     tokens_config = load_tokens_config()
@@ -289,14 +287,13 @@ def main():
     print("\n" + "=" * 80)
     print("    SELECT WALLET TO ANALYZE")
     print("=" * 80)
+    # === MODIFIED SECTION: single-line prompt as requested ===
     for i, w in enumerate(wallets, 1):
         label = w.get("label") or w.get("name") or "Unknown"
         addr = w.get("wallet_address") or w.get("address") or ""
         token_hint = w.get("associated_token") or w.get("token") or "N/A"
         addr_short = addr[:8] + "..." + addr[-4:] if len(addr) > 12 else addr
-        print(f"  {i}. {label}")
-        print(f"     Address : {addr_short}")
-        print(f"     Target token : {token_hint}")
+        print(f"  {i}. {label} ({addr_short}) - Target token: {token_hint}")
 
     wallet = None
     while wallet is None:
