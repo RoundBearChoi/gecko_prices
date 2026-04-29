@@ -16,7 +16,7 @@ CLEAR_SCREEN_ON_UPDATE = True        # Linux-optimized: clears terminal for a cl
 USE_COLORS = True                    # Enable ANSI colors (for Linux terminals)
 
 # Sound alert configuration
-PRICE_CHANGE_THRESHOLD_PERCENT = 5.0  # Play sound if any token's price changes by more than this % (absolute)
+PRICE_CHANGE_THRESHOLD_PERCENT = 3.0  # absolute %
 SOUND_FILE = "kim_dust.mp3"           # Sound file located in the same folder as this script
 
 # Telegram Bot configuration (loaded from environment variables)
